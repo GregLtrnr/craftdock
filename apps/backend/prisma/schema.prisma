@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum ServerType {
+  VANILLA
+  PAPER
+  PURPUR
+  FABRIC
+  FORGE
+  NEOFORGE
+  MODPACK
+}
+
+enum RuntimeMode {
+  NATIVE
+  DOCKER
+}
+
+enum ServerStatus {
+  INSTALLING
+  STOPPED
+  STARTING
+  RUNNING
+  STOPPING
+  CRASHED
+}
+
+enum BackupStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  username     String    @unique
+  passwordHash String
+  role         UserRole  @default(USER)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+  servers      Server[]
+  permissions  ServerPermission[]
+  apiKeys      ApiKey[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Server {
+  id               String       @id @default(cuid())
+  name             String
+  uuid             String       @unique @default(cuid())
+  ownerId          String
+  owner            User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  serverType       ServerType
+  minecraftVersion String
+  javaVersion      String       @default("21")
+  ramMb            Int
+  port             Int          @unique
+  status           ServerStatus @default(INSTALLING)
+  runtimeMode      RuntimeMode  @default(NATIVE)
+  autoRestart      Boolean      @default(true)
+  eulaAccepted     Boolean      @default(false)
+  dataPath         String
+  containerId      String?
+  modpackId        Int?
+  modpackFileId    Int?
+  modpackName      String?
+  maxPlayers       Int          @default(20)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  startedAt        DateTime?
+  permissions      ServerPermission[]
+  backups          Backup[]
+  logs             ServerLog[]
+  scheduledTasks   ScheduledTask[]
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model ServerPermission {
+  id        String   @id @default(cuid())
+  serverId  String
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canManage Boolean  @default(false)
+  canConsole Boolean @default(true)
+  canFiles  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([serverId, userId])
+}
+
+model Allocation {
+  id        String   @id @default(cuid())
+  nodeId    String   @default("local")
+  port      Int      @unique
+  assigned  Boolean  @default(false)
+  serverId  String?
+  createdAt DateTime @default(now())
+
+  @@index([nodeId, assigned])
+}
+
+model Backup {
+  id          String       @id @default(cuid())
+  serverId    String
+  server      Server       @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  name        String
+  filePath    String
+  sizeBytes   BigInt       @default(0)
+  status      BackupStatus @default(PENDING)
+  isScheduled Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
+
+  @@index([serverId])
+}
+
+model ServerLog {
+  id        String   @id @default(cuid())
+  serverId  String
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  level     String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([serverId, createdAt])
+}
+
+model ModpackCache {
+  id        String   @id @default(cuid())
+  curseId   Int      @unique
+  name      String
+  slug      String
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+model ScheduledTask {
+  id        String   @id @default(cuid())
+  serverId  String
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  type      String
+  cronExpr  String
+  enabled   Boolean  @default(true)
+  lastRun   DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([serverId])
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  keyHash   String   @unique
+  prefix    String
+  lastUsed  DateTime?
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  @@index([userId])
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  serverId  String?
+  url       String
+  events    String[]
+  secret    String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Node {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  hostname  String
+  isPrimary Boolean  @default(false)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}

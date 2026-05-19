@@ -1,0 +1,23 @@
+{
+  "name": "craftdock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted Minecraft hosting panel",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "db:generate": "pnpm --filter @craftdock/backend exec prisma generate",
+    "db:migrate": "pnpm --filter @craftdock/backend exec prisma migrate dev",
+    "db:push": "pnpm --filter @craftdock/backend exec prisma db push",
+    "db:studio": "pnpm --filter @craftdock/backend exec prisma studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

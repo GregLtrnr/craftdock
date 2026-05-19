@@ -1,0 +1,269 @@
+"use client";
+
+import { use, useEffect, useState } from "react";
+import { api, type Server, type ServerStats } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ServerTerminal } from "@/components/console/terminal";
+import { ResourceChart } from "@/components/charts/resource-chart";
+import { cn } from "@/lib/utils";
+
+type Tab = "console" | "files" | "players" | "settings";
+
+export default function ServerDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const [server, setServer] = useState<Server | null>(null);
+  const [stats, setStats] = useState<ServerStats | null>(null);
+  const [tab, setTab] = useState<Tab>("console");
+  const [chartData, setChartData] = useState<{ time: string; value: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    const { server: s } = await api.get<{ server: Server }>(`/api/servers/${id}`);
+    setServer(s);
+    const { stats: st } = await api.get<{ stats: ServerStats }>(`/api/servers/${id}/stats`);
+    setStats(st);
+    setChartData((prev) => [
+      ...prev.slice(-19),
+      { time: new Date().toLocaleTimeString(), value: st.memoryUsedMb },
+    ]);
+  };
+
+  useEffect(() => {
+    load().finally(() => setLoading(false));
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
+  }, [id]);
+
+  const action = async (path: string) => {
+    await api.post(`/api/servers/${id}/${path}`);
+    await load();
+  };
+
+  if (loading || !server) {
+    return <p className="text-muted">Loading server...</p>;
+  }
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "console", label: "Console" },
+    { id: "files", label: "Files" },
+    { id: "players", label: "Players" },
+    { id: "settings", label: "Properties" },
+  ];
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">{server.name}</h1>
+          <p className="text-muted">
+            {server.serverType} {server.minecraftVersion} · Port {server.port} · {server.status}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => action("start")} disabled={server.status === "RUNNING"}>
+            Start
+          </Button>
+          <Button variant="secondary" onClick={() => action("stop")}>
+            Stop
+          </Button>
+          <Button variant="secondary" onClick={() => action("restart")}>
+            Restart
+          </Button>
+          <Button variant="danger" onClick={() => action("kill")}>
+            Kill
+          </Button>
+          {!server.eulaAccepted && (
+            <Button variant="secondary" onClick={() => api.post(`/api/servers/${id}/eula`)}>
+              Accept EULA
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <Card>
+          <p className="text-xs text-muted">RAM</p>
+          <p className="text-2xl font-bold">
+            {stats?.memoryUsedMb ?? 0} / {server.ramMb} MB
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-muted">Players</p>
+          <p className="text-2xl font-bold">
+            {stats?.onlinePlayers ?? 0} / {server.maxPlayers}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-muted">Uptime</p>
+          <p className="text-2xl font-bold">
+            {Math.floor((stats?.uptimeSeconds ?? 0) / 60)}m
+          </p>
+        </Card>
+      </div>
+
+      <Card className="mt-4">
+        <ResourceChart data={chartData} dataKey="ram" label="Memory usage (MB)" />
+      </Card>
+
+      <div className="mt-6 flex gap-2 border-b border-border">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "px-4 py-2 text-sm transition-colors",
+              tab === t.id
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted hover:text-foreground"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4">
+        {tab === "console" && <ServerTerminal serverId={id} />}
+        {tab === "files" && <FileManager serverId={id} />}
+        {tab === "players" && <PlayerManager serverId={id} />}
+        {tab === "settings" && <PropertiesEditor serverId={id} />}
+      </div>
+    </div>
+  );
+}
+
+function FileManager({ serverId }: { serverId: string }) {
+  const [files, setFiles] = useState<{ name: string; path: string; isDirectory: boolean }[]>([]);
+  const [path, setPath] = useState(".");
+
+  useEffect(() => {
+    api
+      .get<{ files: { name: string; path: string; isDirectory: boolean }[] }>(
+        `/api/${serverId}/files?path=${encodeURIComponent(path)}`
+      )
+      .then((d) => setFiles(d.files))
+      .catch(() => setFiles([]));
+  }, [serverId, path]);
+
+  return (
+    <Card>
+      <p className="mb-2 text-sm text-muted">/{path}</p>
+      <ul className="space-y-1 font-mono text-sm">
+        {path !== "." && (
+          <li>
+            <button className="text-primary" onClick={() => setPath(".")}>
+              ..
+            </button>
+          </li>
+        )}
+        {files.map((f) => (
+          <li key={f.path}>
+            <button
+              className="hover:text-primary"
+              onClick={() => f.isDirectory && setPath(f.path)}
+            >
+              {f.isDirectory ? "📁" : "📄"} {f.name}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function PlayerManager({ serverId }: { serverId: string }) {
+  const [data, setData] = useState<{
+    ops: { name: string }[];
+    whitelist: { name: string }[];
+    bannedPlayers: { name: string }[];
+  } | null>(null);
+  const [player, setPlayer] = useState("");
+
+  useEffect(() => {
+    api
+      .get<{
+        ops: { name: string }[];
+        whitelist: { name: string }[];
+        bannedPlayers: { name: string }[];
+      }>(`/api/${serverId}/players`)
+      .then(setData)
+      .catch(() => undefined);
+  }, [serverId]);
+
+  return (
+    <Card>
+      <div className="flex gap-2">
+        <input
+          className="flex-1 rounded border border-border bg-background px-3 py-2 text-sm"
+          placeholder="Player name"
+          value={player}
+          onChange={(e) => setPlayer(e.target.value)}
+        />
+        <Button size="sm" onClick={() => api.post(`/api/${serverId}/players/op`, { playerName: player })}>
+          OP
+        </Button>
+        <Button size="sm" variant="danger" onClick={() => api.post(`/api/${serverId}/players/ban`, { playerName: player })}>
+          Ban
+        </Button>
+      </div>
+      {data && (
+        <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <h4 className="font-medium">Ops</h4>
+            <ul>{data.ops?.map((o) => <li key={o.name}>{o.name}</li>)}</ul>
+          </div>
+          <div>
+            <h4 className="font-medium">Whitelist</h4>
+            <ul>{data.whitelist?.map((w) => <li key={w.name}>{w.name}</li>)}</ul>
+          </div>
+          <div>
+            <h4 className="font-medium">Banned</h4>
+            <ul>{data.bannedPlayers?.map((b) => <li key={b.name}>{b.name}</li>)}</ul>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function PropertiesEditor({ serverId }: { serverId: string }) {
+  const [content, setContent] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api
+      .get<{ content: string }>(
+        `/api/${serverId}/files/content?path=${encodeURIComponent("server.properties")}`
+      )
+      .then((d) => setContent(d.content))
+      .catch(() => setContent(""));
+  }, [serverId]);
+
+  const save = async () => {
+    setSaving(true);
+    await api.put(`/api/${serverId}/files/content`, {
+      path: "server.properties",
+      content,
+    });
+    setSaving(false);
+  };
+
+  return (
+    <Card>
+      <h3 className="mb-2 font-medium">server.properties</h3>
+      <textarea
+        className="h-64 w-full rounded border border-border bg-background p-3 font-mono text-sm"
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+      />
+      <Button className="mt-2" onClick={save} disabled={saving}>
+        {saving ? "Saving..." : "Save"}
+      </Button>
+    </Card>
+  );
+}

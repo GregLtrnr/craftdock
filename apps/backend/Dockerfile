@@ -1,0 +1,28 @@
+FROM node:20-bookworm-slim AS base
+RUN apt-get update && apt-get install -y openssl ca-certificates bash openjdk-21-jre-headless && rm -rf /var/lib/apt/lists/*
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+WORKDIR /app
+
+FROM base AS deps
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY apps/backend/package.json ./apps/backend/
+COPY packages/shared/package.json ./packages/shared/
+RUN pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN pnpm --filter @craftdock/shared build
+RUN cd apps/backend && npx prisma generate && pnpm build
+
+FROM base AS runner
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=builder /app/apps/backend/dist ./dist
+COPY --from=builder /app/apps/backend/package.json ./
+COPY --from=builder /app/apps/backend/prisma ./prisma
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+RUN mkdir -p /var/lib/craftdock/servers /var/lib/craftdock/backups
+EXPOSE 4000
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
