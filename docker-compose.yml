@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    networks:
+      - craftdock-net
     environment:
       POSTGRES_USER: craftdock
       POSTGRES_PASSWORD: craftdock
@@ -21,6 +23,8 @@ services:
       context: .
       dockerfile: apps/backend/Dockerfile
     restart: unless-stopped
+    networks:
+      - craftdock-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,6 +52,8 @@ services:
       context: .
       dockerfile: apps/frontend/Dockerfile
     restart: unless-stopped
+    networks:
+      - craftdock-net
     depends_on:
       - backend
     environment:
@@ -58,6 +64,8 @@ services:
   nginx:
     image: nginx:alpine
     restart: unless-stopped
+    networks:
+      - craftdock-net
     depends_on:
       - frontend
       - backend
@@ -74,5 +82,5 @@ volumes:
   craftdock_data:
 
 networks:
-  default:
+  craftdock-net:
     name: craftdock-net
