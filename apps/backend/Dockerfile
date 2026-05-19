@@ -1,9 +1,22 @@
 FROM node:20-bookworm-slim AS base
-RUN apt-get update && apt-get install -y openssl ca-certificates bash openjdk-21-jre-headless && rm -rf /var/lib/apt/lists/*
+# OpenJDK 21 is in bookworm-backports, not the default bookworm repos
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends openssl ca-certificates bash; \
+    echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list; \
+    apt-get update; \
+    apt-get install -y -t bookworm-backports --no-install-recommends openjdk-21-jre-headless; \
+    rm -rf /var/lib/apt/lists/*; \
+    ARCH="$(dpkg --print-architecture)"; \
+    ln -sfn "/usr/lib/jvm/java-21-openjdk-${ARCH}" /opt/java-home
+ENV JAVA_HOME=/opt/java-home
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
 FROM base AS deps
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/shared/package.json ./packages/shared/

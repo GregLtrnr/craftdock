@@ -32,6 +32,7 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       DATA_DIR: /var/lib/craftdock/servers
       BACKUP_DIR: /var/lib/craftdock/backups
+      JAVA_HOME: /opt/java-home
       CURSEFORGE_API_KEY: ${CURSEFORGE_API_KEY:-}
       DOCKER_ENABLED: "true"
     volumes:

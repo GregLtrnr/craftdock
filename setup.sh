@@ -46,6 +46,9 @@ if [[ ! -f .env ]]; then
   sed -i "s/JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/" .env 2>/dev/null || true
 fi
 
+chmod +x scripts/sync-env.sh 2>/dev/null || true
+bash scripts/sync-env.sh
+
 # Install dependencies and build
 if ! command -v pnpm &>/dev/null; then
   corepack enable 2>/dev/null || true
@@ -53,7 +56,26 @@ if ! command -v pnpm &>/dev/null; then
 fi
 
 pnpm install
-pnpm db:push
+
+# Postgres must be reachable at DATABASE_URL (default: localhost:5432)
+if command -v docker &>/dev/null && docker compose version &>/dev/null; then
+  echo "==> Starting Postgres (Docker)..."
+  docker compose up -d postgres
+  echo "==> Waiting for Postgres..."
+  for i in $(seq 1 30); do
+    if docker compose exec -T postgres pg_isready -U craftdock &>/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+fi
+
+# Run db:push as the repo owner when setup was invoked via sudo
+if [[ -n "${SUDO_USER:-}" ]] && [[ "$SUDO_USER" != "root" ]]; then
+  sudo -u "$SUDO_USER" pnpm db:push
+else
+  pnpm db:push
+fi
 
 echo ""
 echo "==> Setup complete!"

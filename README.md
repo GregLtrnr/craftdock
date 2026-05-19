@@ -79,6 +79,22 @@ sudo ./setup.sh
 docker compose --profile production up -d
 ```
 
+If `db:push` fails with `Environment variable not found: DATABASE_URL`:
+
+```bash
+cp .env.example .env   # if you have not already
+bash scripts/sync-env.sh
+docker compose up -d postgres   # Prisma needs Postgres running on localhost:5432
+pnpm db:push                    # avoid sudo — use your normal user
+```
+
+If `docker compose build` fails on `openjdk-21-jre-headless`, pull the latest `apps/backend/Dockerfile` (uses Debian bookworm-backports) and rebuild:
+
+```bash
+docker compose build --no-cache backend
+docker compose up -d
+```
+
 If `pnpm install` fails with `gyp ERR! not found: make`, install build tools and retry:
 
 ```bash

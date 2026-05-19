@@ -7,10 +7,11 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "db:generate": "pnpm --filter @craftdock/backend exec prisma generate",
-    "db:migrate": "pnpm --filter @craftdock/backend exec prisma migrate dev",
-    "db:push": "pnpm --filter @craftdock/backend exec prisma db push",
-    "db:studio": "pnpm --filter @craftdock/backend exec prisma studio"
+    "db:sync-env": "bash scripts/sync-env.sh",
+    "db:generate": "bash scripts/sync-env.sh && pnpm --filter @craftdock/backend exec prisma generate",
+    "db:migrate": "bash scripts/sync-env.sh && pnpm --filter @craftdock/backend exec prisma migrate dev",
+    "db:push": "bash scripts/sync-env.sh && pnpm --filter @craftdock/backend exec prisma db push",
+    "db:studio": "bash scripts/sync-env.sh && pnpm --filter @craftdock/backend exec prisma studio"
   },
   "devDependencies": {
     "turbo": "^2.5.4",
