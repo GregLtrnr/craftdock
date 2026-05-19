@@ -79,6 +79,14 @@ sudo ./setup.sh
 docker compose --profile production up -d
 ```
 
+If `pnpm install` fails with `gyp ERR! not found: make`, install build tools and retry:
+
+```bash
+sudo apt-get install -y build-essential python3
+pnpm install
+pnpm db:push
+```
+
 Nginx terminates HTTP and proxies `/api` and `/socket.io` to the backend.
 
 ### Environment variables

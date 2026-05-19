@@ -12,7 +12,8 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 apt-get update
-apt-get install -y curl git ca-certificates gnupg lsb-release openjdk-21-jre-headless
+# build-essential: required for native npm modules (e.g. argon2) when not using Docker-only deploy
+apt-get install -y curl git ca-certificates gnupg lsb-release openjdk-21-jre-headless build-essential python3
 
 # Docker
 if ! command -v docker &>/dev/null; then
@@ -46,14 +47,13 @@ if [[ ! -f .env ]]; then
 fi
 
 # Install dependencies and build
-if command -v pnpm &>/dev/null; then
-  pnpm install
-  pnpm db:push
-else
+if ! command -v pnpm &>/dev/null; then
+  corepack enable 2>/dev/null || true
   npm install -g pnpm@9
-  pnpm install
-  pnpm db:push
 fi
+
+pnpm install
+pnpm db:push
 
 echo ""
 echo "==> Setup complete!"
