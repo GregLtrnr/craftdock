@@ -88,7 +88,7 @@ docker compose up -d postgres   # Prisma needs Postgres running on localhost:543
 pnpm db:push                    # avoid sudo — use your normal user
 ```
 
-If `docker compose build` fails on `openjdk-21-jre-headless`, pull the latest `apps/backend/Dockerfile` (uses Debian bookworm-backports) and rebuild:
+If `docker compose build` fails installing Java, pull the latest `apps/backend/Dockerfile` (bundles Eclipse Temurin 21) and rebuild:
 
 ```bash
 docker compose build --no-cache backend

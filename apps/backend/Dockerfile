@@ -1,15 +1,13 @@
+# Java 21 via Temurin — Debian bookworm apt often has no openjdk-21 package
+FROM eclipse-temurin:21-jre-jammy AS java-runtime
+
 FROM node:20-bookworm-slim AS base
-# OpenJDK 21 is in bookworm-backports, not the default bookworm repos
-RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends openssl ca-certificates bash; \
-    echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list; \
-    apt-get update; \
-    apt-get install -y -t bookworm-backports --no-install-recommends openjdk-21-jre-headless; \
-    rm -rf /var/lib/apt/lists/*; \
-    ARCH="$(dpkg --print-architecture)"; \
-    ln -sfn "/usr/lib/jvm/java-21-openjdk-${ARCH}" /opt/java-home
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl ca-certificates bash \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=java-runtime /opt/java/openjdk /opt/java-home
 ENV JAVA_HOME=/opt/java-home
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
