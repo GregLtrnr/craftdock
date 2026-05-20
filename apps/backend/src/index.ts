@@ -29,9 +29,10 @@ async function bootstrap() {
   const app = express();
   const server = http.createServer(app);
 
+  const socketCorsOrigins = [env.frontendUrl, env.frontendUrl.replace(/:3000$/, ":4000")];
   const io = new SocketServer(server, {
     cors: {
-      origin: env.frontendUrl,
+      origin: socketCorsOrigins,
       credentials: true,
     },
     path: "/socket.io",

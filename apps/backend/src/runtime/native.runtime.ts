@@ -50,7 +50,8 @@ export class NativeRuntime implements RuntimeInstance {
     await fs.chmod(startScript, 0o755);
 
     // Use spawn with script path only — never shell-interpolate user input
-    this.process = spawn("/bin/bash", [startScript], {
+    // Line-buffer stdout so the web console updates live (Java buffers when not a TTY)
+    this.process = spawn("stdbuf", ["-oL", "-eL", "/bin/bash", startScript], {
       cwd: this.options.dataPath,
       env: {
         ...process.env,

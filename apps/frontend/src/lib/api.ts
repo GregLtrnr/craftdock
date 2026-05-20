@@ -1,6 +1,14 @@
 /**
  * Public API URL — frontend :3000, API :4000 on the same host.
  */
+/** Socket.IO URL — same origin so Next can proxy /socket.io and httpOnly cookies work. */
+export function getSocketBase(): string {
+  if (typeof window === "undefined") return "";
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  return window.location.origin;
+}
+
 export function getApiBase(): string {
   if (typeof window === "undefined") {
     return process.env.API_PROXY_URL ?? "http://127.0.0.1:4000";

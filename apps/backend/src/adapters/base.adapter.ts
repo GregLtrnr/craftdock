@@ -67,7 +67,7 @@ set -e
 cd "$(dirname "$0")"
 JAVA="${process.env.JAVA_HOME ?? "/usr/lib/jvm/java-21-openjdk-amd64"}/bin/java"
 MEM="${ctx.ramMb}"
-exec "$JAVA" -Xms\${MEM}M -Xmx\${MEM}M -jar server.jar nogui
+exec stdbuf -oL -eL "$JAVA" -Xms\${MEM}M -Xmx\${MEM}M -jar server.jar nogui
 `;
     const scriptPath = path.join(ctx.dataPath, "start.sh");
     await fs.writeFile(scriptPath, script, { mode: 0o755 });

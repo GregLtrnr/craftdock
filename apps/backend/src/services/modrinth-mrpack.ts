@@ -139,7 +139,7 @@ set -e
 cd "$(dirname "$0")"
 JAVA="\${JAVA_HOME:-/opt/java-home}/bin/java"
 MEM="${opts.ramMb}"
-exec "$JAVA" -Xms\${MEM}M -Xmx\${MEM}M -jar server.jar nogui
+exec stdbuf -oL -eL "$JAVA" -Xms\${MEM}M -Xmx\${MEM}M -jar server.jar nogui
 `;
   await fs.writeFile(path.join(dataPath, "start.sh"), script, { mode: 0o755 });
 }

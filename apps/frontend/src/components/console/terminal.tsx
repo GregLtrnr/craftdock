@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getApiBase } from "@/lib/api";
+import { getSocketBase } from "@/lib/api";
 
 /**
  * Live Minecraft console via xterm + Socket.IO.
@@ -46,17 +46,31 @@ export function ServerTerminal({ serverId }: { serverId: string }) {
       term.loadAddon(new WebLinksAddon());
       term.open(termRef.current);
       fit.fit();
+      term.writeln("\x1b[90mConnecting to console…\x1b[0m");
 
-      const tokenMatch = document.cookie.match(/craftdock_token=([^;]+)/);
-
-      socket = io(getApiBase(), {
+      socket = io(getSocketBase(), {
         path: "/socket.io",
         withCredentials: true,
-        auth: { token: tokenMatch?.[1] },
+        transports: ["websocket", "polling"],
       });
 
-      socket.emit("console:join", serverId, (err?: string) => {
-        if (err) term.writeln(`\x1b[31mFailed to join console: ${err}\x1b[0m`);
+      socket.on("connect_error", (err: Error) => {
+        term.writeln(`\x1b[31mConnection failed: ${err.message}\x1b[0m`);
+        term.writeln(
+          "\x1b[33mCheck FRONTEND_URL in .env matches how you open the panel (e.g. http://192.168.1.170:3000).\x1b[0m"
+        );
+      });
+
+      socket.on("console:error", (msg: { message: string }) => {
+        term.writeln(`\x1b[31m${msg.message}\x1b[0m`);
+      });
+
+      socket.on("connect", () => {
+        socket.emit("console:join", serverId, (err?: string) => {
+          if (err) {
+            term.writeln(`\x1b[31mFailed to join console: ${err}\x1b[0m`);
+          }
+        });
       });
 
       socket.on("console:output", (msg: { data: string }) => {

@@ -11,12 +11,19 @@ import { cn } from "@/lib/utils";
 // xterm.js uses `self` — must not load during SSR
 const ServerTerminal = dynamic(
   () => import("@/components/console/terminal").then((m) => m.ServerTerminal),
-  { ssr: false, loading: () => <p className="text-sm text-muted">Loading console…</p> }
+  {
+    ssr: false,
+    loading: () => <p className="text-sm text-muted">Loading console…</p>,
+  },
 );
 
 const ResourceChart = dynamic(
-  () => import("@/components/charts/resource-chart").then((m) => m.ResourceChart),
-  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-lg bg-card" /> }
+  () =>
+    import("@/components/charts/resource-chart").then((m) => m.ResourceChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-48 animate-pulse rounded-lg bg-card" />,
+  },
 );
 
 type Tab = "console" | "files" | "players" | "settings";
@@ -32,7 +39,9 @@ export default function ServerDetailPage({
   const [deleting, setDeleting] = useState(false);
   const [stats, setStats] = useState<ServerStats | null>(null);
   const [tab, setTab] = useState<Tab>("console");
-  const [chartData, setChartData] = useState<{ time: string; value: number }[]>([]);
+  const [chartData, setChartData] = useState<{ time: string; value: number }[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [installLogs, setInstallLogs] = useState<
     { level: string; message: string; createdAt: string }[]
@@ -46,7 +55,9 @@ export default function ServerDetailPage({
   }, []);
 
   const load = async () => {
-    const { server: s } = await api.get<{ server: Server }>(`/api/servers/${id}`);
+    const { server: s } = await api.get<{ server: Server }>(
+      `/api/servers/${id}`,
+    );
     setServer(s);
     if (s.status === "INSTALLING" || s.status === "CRASHED") {
       try {
@@ -58,7 +69,9 @@ export default function ServerDetailPage({
         setInstallLogs([]);
       }
     }
-    const { stats: st } = await api.get<{ stats: ServerStats }>(`/api/servers/${id}/stats`);
+    const { stats: st } = await api.get<{ stats: ServerStats }>(
+      `/api/servers/${id}/stats`,
+    );
     setStats(st);
     setChartData((prev) => [
       ...prev.slice(-19),
@@ -80,7 +93,7 @@ export default function ServerDetailPage({
   const deleteServer = async () => {
     if (
       !confirm(
-        `Delete "${server?.name}"? This removes all server files and cannot be undone.`
+        `Delete "${server?.name}"? This removes all server files and cannot be undone.`,
       )
     ) {
       return;
@@ -113,11 +126,15 @@ export default function ServerDetailPage({
         <div>
           <h1 className="text-3xl font-bold">{server.name}</h1>
           <p className="text-muted">
-            {server.serverType} {server.minecraftVersion} · Port {server.port} · {server.status}
+            {server.serverType} {server.minecraftVersion} · Port {server.port} ·{" "}
+            {server.status}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => action("start")} disabled={server.status === "RUNNING"}>
+          <Button
+            onClick={() => action("start")}
+            disabled={server.status === "RUNNING"}
+          >
             Start
           </Button>
           <Button variant="secondary" onClick={() => action("stop")}>
@@ -133,7 +150,10 @@ export default function ServerDetailPage({
             {deleting ? "Deleting…" : "Delete"}
           </Button>
           {!server.eulaAccepted && (
-            <Button variant="secondary" onClick={() => api.post(`/api/servers/${id}/eula`)}>
+            <Button
+              variant="secondary"
+              onClick={() => api.post(`/api/servers/${id}/eula`)}
+            >
               Accept EULA
             </Button>
           )}
@@ -146,30 +166,29 @@ export default function ServerDetailPage({
           <p className="mt-2 font-mono text-lg">
             {connectHost}:{server.port}
           </p>
-          <p className="mt-2 text-sm text-muted">
-            Use this address in Multiplayer (not ping — Minecraft does not respond to ICMP).
-            The port is {server.port}, not necessarily 25565.
-          </p>
         </Card>
       )}
 
-      {(server.status === "INSTALLING" || server.status === "CRASHED") && installLogs.length > 0 && (
-        <Card className="mt-6 border-danger/40">
-          <h3 className="font-semibold">
-            {server.status === "CRASHED" ? "Install failed" : "Installing…"}
-          </h3>
-          <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto font-mono text-xs">
-            {installLogs.map((line, i) => (
-              <li
-                key={`${line.createdAt}-${i}`}
-                className={line.level === "error" ? "text-danger" : "text-muted"}
-              >
-                {line.message}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      {(server.status === "INSTALLING" || server.status === "CRASHED") &&
+        installLogs.length > 0 && (
+          <Card className="mt-6 border-danger/40">
+            <h3 className="font-semibold">
+              {server.status === "CRASHED" ? "Install failed" : "Installing…"}
+            </h3>
+            <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto font-mono text-xs">
+              {installLogs.map((line, i) => (
+                <li
+                  key={`${line.createdAt}-${i}`}
+                  className={
+                    line.level === "error" ? "text-danger" : "text-muted"
+                  }
+                >
+                  {line.message}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <Card>
@@ -193,7 +212,11 @@ export default function ServerDetailPage({
       </div>
 
       <Card className="mt-4">
-        <ResourceChart data={chartData} dataKey="ram" label="Memory usage (MB)" />
+        <ResourceChart
+          data={chartData}
+          dataKey="ram"
+          label="Memory usage (MB)"
+        />
       </Card>
 
       <div className="mt-6 flex gap-2 border-b border-border">
@@ -205,7 +228,7 @@ export default function ServerDetailPage({
               "px-4 py-2 text-sm transition-colors",
               tab === t.id
                 ? "border-b-2 border-primary text-primary"
-                : "text-muted hover:text-foreground"
+                : "text-muted hover:text-foreground",
             )}
           >
             {t.label}
@@ -217,20 +240,24 @@ export default function ServerDetailPage({
         {tab === "console" && <ServerTerminal serverId={id} />}
         {tab === "files" && <FileManager serverId={id} />}
         {tab === "players" && <PlayerManager serverId={id} />}
-        {tab === "settings" && <PropertiesEditor serverId={id} server={server} />}
+        {tab === "settings" && (
+          <PropertiesEditor serverId={id} server={server} />
+        )}
       </div>
     </div>
   );
 }
 
 function FileManager({ serverId }: { serverId: string }) {
-  const [files, setFiles] = useState<{ name: string; path: string; isDirectory: boolean }[]>([]);
+  const [files, setFiles] = useState<
+    { name: string; path: string; isDirectory: boolean }[]
+  >([]);
   const [path, setPath] = useState(".");
 
   useEffect(() => {
     api
       .get<{ files: { name: string; path: string; isDirectory: boolean }[] }>(
-        `/api/${serverId}/files?path=${encodeURIComponent(path)}`
+        `/api/${serverId}/files?path=${encodeURIComponent(path)}`,
       )
       .then((d) => setFiles(d.files))
       .catch(() => setFiles([]));
@@ -290,10 +317,21 @@ function PlayerManager({ serverId }: { serverId: string }) {
           value={player}
           onChange={(e) => setPlayer(e.target.value)}
         />
-        <Button size="sm" onClick={() => api.post(`/api/${serverId}/players/op`, { playerName: player })}>
+        <Button
+          size="sm"
+          onClick={() =>
+            api.post(`/api/${serverId}/players/op`, { playerName: player })
+          }
+        >
           OP
         </Button>
-        <Button size="sm" variant="danger" onClick={() => api.post(`/api/${serverId}/players/ban`, { playerName: player })}>
+        <Button
+          size="sm"
+          variant="danger"
+          onClick={() =>
+            api.post(`/api/${serverId}/players/ban`, { playerName: player })
+          }
+        >
           Ban
         </Button>
       </div>
@@ -301,15 +339,27 @@ function PlayerManager({ serverId }: { serverId: string }) {
         <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
           <div>
             <h4 className="font-medium">Ops</h4>
-            <ul>{data.ops?.map((o) => <li key={o.name}>{o.name}</li>)}</ul>
+            <ul>
+              {data.ops?.map((o) => (
+                <li key={o.name}>{o.name}</li>
+              ))}
+            </ul>
           </div>
           <div>
             <h4 className="font-medium">Whitelist</h4>
-            <ul>{data.whitelist?.map((w) => <li key={w.name}>{w.name}</li>)}</ul>
+            <ul>
+              {data.whitelist?.map((w) => (
+                <li key={w.name}>{w.name}</li>
+              ))}
+            </ul>
           </div>
           <div>
             <h4 className="font-medium">Banned</h4>
-            <ul>{data.bannedPlayers?.map((b) => <li key={b.name}>{b.name}</li>)}</ul>
+            <ul>
+              {data.bannedPlayers?.map((b) => (
+                <li key={b.name}>{b.name}</li>
+              ))}
+            </ul>
           </div>
         </div>
       )}
@@ -317,14 +367,20 @@ function PlayerManager({ serverId }: { serverId: string }) {
   );
 }
 
-function PropertiesEditor({ serverId, server }: { serverId: string; server: Server }) {
+function PropertiesEditor({
+  serverId,
+  server,
+}: {
+  serverId: string;
+  server: Server;
+}) {
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api
       .get<{ content: string }>(
-        `/api/${serverId}/files/content?path=${encodeURIComponent("server.properties")}`
+        `/api/${serverId}/files/content?path=${encodeURIComponent("server.properties")}`,
       )
       .then((d) => setContent(d.content))
       .catch(() => setContent(""));
@@ -346,9 +402,12 @@ function PropertiesEditor({ serverId, server }: { serverId: string; server: Serv
         {server.dataPath ?? "—"}
       </p>
       <p className="mb-4 text-xs text-muted">
-        On Docker: volume <code className="text-foreground">craftdock_data</code>, usually{" "}
-        <code className="text-foreground">/var/lib/craftdock/servers/&lt;uuid&gt;/</code> inside the
-        backend container.
+        On Docker: volume{" "}
+        <code className="text-foreground">craftdock_data</code>, usually{" "}
+        <code className="text-foreground">
+          /var/lib/craftdock/servers/&lt;uuid&gt;/
+        </code>{" "}
+        inside the backend container.
       </p>
       <h3 className="mb-2 font-medium">server.properties</h3>
       <textarea
