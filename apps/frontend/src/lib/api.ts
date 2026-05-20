@@ -77,6 +77,7 @@ export interface Server {
   createdAt: string;
   startedAt?: string;
   owner?: { username: string };
+  dataPath?: string;
 }
 
 export interface ServerStats {

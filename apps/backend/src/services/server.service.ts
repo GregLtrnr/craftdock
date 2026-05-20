@@ -86,7 +86,10 @@ export async function createServer(ownerId: string, input: CreateServerInput) {
 async function installServer(serverId: string): Promise<void> {
   const server = await getServer(serverId);
 
-  if (server.serverType === "MODPACK" && server.modpackFileId) {
+  if (
+    server.serverType === "MODPACK" &&
+    (server.modpackVersionId || server.modpackFileId != null)
+  ) {
     await installModpackServer(server);
     return;
   }

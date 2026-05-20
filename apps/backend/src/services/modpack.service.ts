@@ -62,11 +62,12 @@ export async function installModpackToServer(
   }
   const pathMod = await import("path");
   const fs = await import("fs/promises");
-  const tarMod = await import("tar");
+  const { extractArchive, removeFileIfExists } = await import("../lib/extract-archive");
   const { buffer, fileName } = await curseForgeService.downloadModpackFile(modId, fileId);
-  const zipPath = pathMod.join(dataPath, fileName);
-  await fs.writeFile(zipPath, buffer);
-  await tarMod.x({ file: zipPath, cwd: dataPath });
+  const archivePath = pathMod.join(dataPath, fileName);
+  await fs.writeFile(archivePath, buffer);
+  await extractArchive(archivePath, dataPath);
+  await removeFileIfExists(archivePath);
 }
 
 export async function getModpackSourcesStatus(): Promise<{

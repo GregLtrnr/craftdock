@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api, type Server, type ServerStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,7 +27,9 @@ export default function ServerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const [server, setServer] = useState<Server | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [stats, setStats] = useState<ServerStats | null>(null);
   const [tab, setTab] = useState<Tab>("console");
   const [chartData, setChartData] = useState<{ time: string; value: number }[]>([]);
@@ -52,6 +55,24 @@ export default function ServerDetailPage({
   const action = async (path: string) => {
     await api.post(`/api/servers/${id}/${path}`);
     await load();
+  };
+
+  const deleteServer = async () => {
+    if (
+      !confirm(
+        `Delete "${server?.name}"? This removes all server files and cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api.delete(`/api/servers/${id}`);
+      router.push("/dashboard");
+    } catch (err) {
+      alert((err as Error).message);
+      setDeleting(false);
+    }
   };
 
   if (loading || !server) {
@@ -86,6 +107,9 @@ export default function ServerDetailPage({
           </Button>
           <Button variant="danger" onClick={() => action("kill")}>
             Kill
+          </Button>
+          <Button variant="danger" onClick={deleteServer} disabled={deleting}>
+            {deleting ? "Deleting…" : "Delete"}
           </Button>
           {!server.eulaAccepted && (
             <Button variant="secondary" onClick={() => api.post(`/api/servers/${id}/eula`)}>
@@ -141,7 +165,7 @@ export default function ServerDetailPage({
         {tab === "console" && <ServerTerminal serverId={id} />}
         {tab === "files" && <FileManager serverId={id} />}
         {tab === "players" && <PlayerManager serverId={id} />}
-        {tab === "settings" && <PropertiesEditor serverId={id} />}
+        {tab === "settings" && <PropertiesEditor serverId={id} server={server} />}
       </div>
     </div>
   );
@@ -241,7 +265,7 @@ function PlayerManager({ serverId }: { serverId: string }) {
   );
 }
 
-function PropertiesEditor({ serverId }: { serverId: string }) {
+function PropertiesEditor({ serverId, server }: { serverId: string; server: Server }) {
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -265,6 +289,15 @@ function PropertiesEditor({ serverId }: { serverId: string }) {
 
   return (
     <Card>
+      <h3 className="mb-2 font-medium">Storage</h3>
+      <p className="mb-4 font-mono text-xs text-muted break-all">
+        {server.dataPath ?? "—"}
+      </p>
+      <p className="mb-4 text-xs text-muted">
+        On Docker: volume <code className="text-foreground">craftdock_data</code>, usually{" "}
+        <code className="text-foreground">/var/lib/craftdock/servers/&lt;uuid&gt;/</code> inside the
+        backend container.
+      </p>
       <h3 className="mb-2 font-medium">server.properties</h3>
       <textarea
         className="h-64 w-full rounded border border-border bg-background p-3 font-mono text-sm"
