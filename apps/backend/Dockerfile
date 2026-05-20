@@ -1,9 +1,9 @@
-# Java 21 via Temurin — Debian bookworm apt often has no openjdk-21 package
+# Java 21 via Temurin
 FROM eclipse-temurin:21-jre-jammy AS java-runtime
 
 FROM node:20-bookworm-slim AS base
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl ca-certificates bash \
+    && apt-get install -y --no-install-recommends openssl ca-certificates bash wget \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=java-runtime /opt/java/openjdk /opt/java-home
 ENV JAVA_HOME=/opt/java-home
@@ -24,21 +24,22 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm --filter @craftdock/shared build
-RUN cd apps/backend && pnpm exec prisma generate && pnpm build
+RUN pnpm --filter @craftdock/backend exec prisma generate
+RUN pnpm --filter @craftdock/backend build
+# Portable production bundle with all runtime deps (fixes "Cannot find module 'express'")
+RUN pnpm deploy --filter @craftdock/backend --prod /prod/backend
 
 FROM base AS runner
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends wget \
-    && rm -rf /var/lib/apt/lists/*
+RUN npm install -g prisma@6.19.3
 ENV NODE_ENV=production
 WORKDIR /app
+
+COPY --from=builder /prod/backend/ ./
 COPY --from=builder /app/apps/backend/dist ./dist
-COPY --from=builder /app/apps/backend/package.json ./
 COPY --from=builder /app/apps/backend/prisma ./prisma
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+
 RUN mkdir -p /var/lib/craftdock/servers /var/lib/craftdock/backups
-# Pin Prisma 6 — `npx prisma` would pull Prisma 7 and break schema.prisma
-RUN npm install -g prisma@6.19.3
+
 EXPOSE 4000
-CMD ["sh", "-c", "prisma migrate deploy || prisma db push; exec node dist/index.js"]
+# db push only (skip migrate — avoids P3005 on existing DB); --skip-generate avoids npm install in container
+CMD ["sh", "-c", "prisma db push --skip-generate || true; exec node dist/index.js"]
