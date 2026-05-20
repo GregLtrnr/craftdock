@@ -1,30 +1,119 @@
 @import "tailwindcss";
 @import "xterm/css/xterm.css";
 
-@theme {
-  --color-background: #0a0e17;
-  --color-foreground: #e8edf5;
-  --color-card: #111827;
-  --color-card-hover: #1a2332;
-  --color-border: #1f2937;
-  --color-primary: #22c55e;
-  --color-primary-hover: #16a34a;
-  --color-muted: #6b7280;
-  --color-danger: #ef4444;
-  --color-warning: #f59e0b;
+/* ─── Light theme (default variables, overridden by [data-theme]) ─── */
+:root,
+[data-theme="light"] {
+  --color-background: #f4f4f5;
+  --color-background-subtle: #ffffff;
+  --color-foreground: #18181b;
+  --color-card: #ffffff;
+  --color-card-hover: #f4f4f5;
+  --color-border: #e4e4e7;
+  --color-border-strong: #d4d4d8;
+  --color-primary: #059669;
+  --color-primary-hover: #047857;
+  --color-primary-muted: #d1fae5;
+  --color-muted: #71717a;
+  --color-muted-foreground: #52525b;
+  --color-danger: #dc2626;
+  --color-danger-muted: #fee2e2;
+  --color-warning: #d97706;
+  --color-warning-muted: #fef3c7;
+  --color-success: #059669;
+  --color-success-muted: #d1fae5;
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-elevated: 0 10px 40px rgb(0 0 0 / 0.08);
+  --sidebar-gradient: linear-gradient(180deg, #ffffff 0%, #f4f4f5 100%);
+  --grid-pattern: radial-gradient(circle at 1px 1px, #d4d4d8 1px, transparent 0);
+}
+
+[data-theme="dark"] {
+  --color-background: #09090b;
+  --color-background-subtle: #0f0f12;
+  --color-foreground: #fafafa;
+  --color-card: #18181b;
+  --color-card-hover: #27272a;
+  --color-border: #27272a;
+  --color-border-strong: #3f3f46;
+  --color-primary: #34d399;
+  --color-primary-hover: #10b981;
+  --color-primary-muted: #064e3b;
+  --color-muted: #a1a1aa;
+  --color-muted-foreground: #d4d4d8;
+  --color-danger: #f87171;
+  --color-danger-muted: #450a0a;
+  --color-warning: #fbbf24;
+  --color-warning-muted: #422006;
+  --color-success: #34d399;
+  --color-success-muted: #064e3b;
+  --shadow-card: 0 4px 24px rgb(0 0 0 / 0.35);
+  --shadow-elevated: 0 20px 50px rgb(0 0 0 / 0.5);
+  --sidebar-gradient: linear-gradient(180deg, #18181b 0%, #09090b 100%);
+  --grid-pattern: radial-gradient(circle at 1px 1px, #27272a 1px, transparent 0);
+}
+
+@theme inline {
+  --color-background: var(--color-background);
+  --color-background-subtle: var(--color-background-subtle);
+  --color-foreground: var(--color-foreground);
+  --color-card: var(--color-card);
+  --color-card-hover: var(--color-card-hover);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-muted: var(--color-primary-muted);
+  --color-muted: var(--color-muted);
+  --color-muted-foreground: var(--color-muted-foreground);
+  --color-danger: var(--color-danger);
+  --color-danger-muted: var(--color-danger-muted);
+  --color-warning: var(--color-warning);
+  --color-warning-muted: var(--color-warning-muted);
+  --color-success: var(--color-success);
+  --color-success-muted: var(--color-success-muted);
+  --font-sans: var(--font-outfit), system-ui, sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 body {
   background: var(--color-background);
   color: var(--color-foreground);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle grid on main content area */
+.panel-grid-bg {
+  background-image: var(--grid-pattern);
+  background-size: 24px 24px;
 }
 
 .xterm {
   padding: 8px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 4px;
 }

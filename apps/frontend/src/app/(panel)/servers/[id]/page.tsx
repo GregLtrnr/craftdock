@@ -3,9 +3,12 @@
 import dynamic from "next/dynamic";
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { api, type Server, type ServerStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge, statusToBadgeVariant } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 // xterm.js uses `self` — must not load during SSR
@@ -142,13 +145,24 @@ export default function ServerDetailPage({
   ];
 
   return (
-    <div>
+    <div className="space-y-6">
+      <Link
+        href="/dashboard"
+        className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-primary"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to dashboard
+      </Link>
+
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">{server.name}</h1>
-          <p className="text-muted">
-            {server.serverType} {server.minecraftVersion} · Port {server.port} ·{" "}
-            {server.status}
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">{server.name}</h1>
+            <Badge variant={statusToBadgeVariant(server.status)}>{server.status}</Badge>
+          </div>
+          <p className="mt-2 text-muted">
+            {server.serverType} · Minecraft {server.minecraftVersion} · Port{" "}
+            <span className="font-mono text-foreground">{server.port}</span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -270,16 +284,17 @@ export default function ServerDetailPage({
         />
       </Card>
 
-      <div className="mt-6 flex gap-2 border-b border-border">
+      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card/80 p-1.5">
         {tabs.map((t) => (
           <button
             key={t.id}
+            type="button"
             onClick={() => setTab(t.id)}
             className={cn(
-              "px-4 py-2 text-sm transition-colors",
+              "rounded-lg px-4 py-2 text-sm font-medium transition-all",
               tab === t.id
-                ? "border-b-2 border-primary text-primary"
-                : "text-muted hover:text-foreground",
+                ? "bg-primary text-black shadow-sm"
+                : "text-muted hover:bg-card-hover hover:text-foreground",
             )}
           >
             {t.label}

@@ -39,11 +39,12 @@ export function ServerTerminal({ serverId }: { serverId: string }) {
       if (disposed || !termContainerRef.current) return;
 
       const fit = new FitAddon();
+      const dark = document.documentElement.getAttribute("data-theme") !== "light";
       term = new Terminal({
         theme: {
-          background: "#0a0e17",
-          foreground: "#e8edf5",
-          cursor: "#22c55e",
+          background: dark ? "#09090b" : "#f4f4f5",
+          foreground: dark ? "#fafafa" : "#18181b",
+          cursor: dark ? "#34d399" : "#059669",
         },
         fontFamily: "Menlo, Monaco, monospace",
         fontSize: 13,
@@ -122,7 +123,7 @@ export function ServerTerminal({ serverId }: { serverId: string }) {
 
   return (
     <div className="space-y-2">
-      <div className="h-[480px] overflow-hidden rounded-lg border border-border bg-[#0a0e17]">
+      <div className="h-[480px] overflow-hidden rounded-2xl border border-border bg-background">
         <div ref={termContainerRef} className="h-full w-full p-2" />
       </div>
 

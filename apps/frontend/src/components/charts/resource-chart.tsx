@@ -12,7 +12,7 @@ import {
 export function ResourceChart({
   data,
   dataKey,
-  color = "#22c55e",
+  color = "var(--color-primary)",
   label,
 }: {
   data: { time: string; value: number }[];
@@ -31,13 +31,14 @@ export function ResourceChart({
               <stop offset="95%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <XAxis dataKey="time" stroke="#6b7280" fontSize={10} />
-          <YAxis stroke="#6b7280" fontSize={10} />
+          <XAxis dataKey="time" stroke="var(--color-muted)" fontSize={10} />
+          <YAxis stroke="var(--color-muted)" fontSize={10} />
           <Tooltip
             contentStyle={{
-              background: "#111827",
-              border: "1px solid #1f2937",
-              borderRadius: 8,
+              background: "var(--color-card)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 12,
+              color: "var(--color-foreground)",
             }}
           />
           <Area

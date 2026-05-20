@@ -84,13 +84,16 @@ export default function ModpacksPage() {
   };
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold">Modpacks</h1>
-      <p className="text-muted">
-        Modrinth by default — no API key. CurseForge is optional if your key still works.
-      </p>
+    <div className="space-y-6">
+      <header>
+        <p className="text-sm font-medium text-primary">Hosting</p>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight">Modpacks</h1>
+        <p className="mt-2 max-w-xl text-muted">
+          Modrinth by default — no API key. CurseForge is optional if your key still works.
+        </p>
+      </header>
 
-      <div className="mt-4 flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           variant={source === "modrinth" ? "default" : "secondary"}
           size="sm"
