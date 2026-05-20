@@ -27,7 +27,6 @@ export function ServerTerminal({ serverId }: { serverId: string }) {
         import("@xterm/addon-web-links"),
         import("socket.io-client"),
       ]);
-      await import("xterm/css/xterm.css");
 
       if (disposed || !termRef.current) return;
 
