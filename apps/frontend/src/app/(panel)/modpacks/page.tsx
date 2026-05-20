@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 
+interface ModpackVersion {
+  id: number;
+  name: string;
+  gameVersion: string;
+  fileName?: string;
+}
+
 interface Modpack {
   id: number;
   name: string;
@@ -13,13 +20,14 @@ interface Modpack {
   summary: string;
   downloadCount: number;
   logoUrl?: string;
+  versions?: ModpackVersion[];
 }
 
 export default function ModpacksPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Modpack[]>([]);
   const [selected, setSelected] = useState<Modpack | null>(null);
-  const [files, setFiles] = useState<{ id: number; name: string; gameVersion: string }[]>([]);
+  const [files, setFiles] = useState<ModpackVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [filesLoading, setFilesLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,6 +35,8 @@ export default function ModpacksPage() {
   const search = async () => {
     setLoading(true);
     setError("");
+    setSelected(null);
+    setFiles([]);
     try {
       const { results: r } = await api.get<{ results: Modpack[] }>(
         `/api/modpacks/search?query=${encodeURIComponent(query)}`
@@ -41,13 +51,19 @@ export default function ModpacksPage() {
 
   const selectModpack = async (mod: Modpack) => {
     setSelected(mod);
+    setError("");
+
+    if (mod.versions?.length) {
+      setFiles(mod.versions);
+      return;
+    }
+
     setFiles([]);
     setFilesLoading(true);
-    setError("");
     try {
-      const { files: f } = await api.get<{
-        files: { id: number; name: string; gameVersion: string }[];
-      }>(`/api/modpacks/${mod.id}/files`);
+      const { files: f } = await api.get<{ files: ModpackVersion[] }>(
+        `/api/modpacks/${mod.id}/files?slug=${encodeURIComponent(mod.slug)}`
+      );
       setFiles(f);
     } catch (err) {
       setError((err as Error).message);
@@ -56,7 +72,7 @@ export default function ModpacksPage() {
     }
   };
 
-  const install = async (fileId: number, gameVersion: string) => {
+  const install = async (fileId: number) => {
     const port = 25566 + Math.floor(Math.random() * 100);
     await api.post("/api/modpacks/install", {
       modpackId: selected!.id,
@@ -104,6 +120,7 @@ export default function ModpacksPage() {
                 <p className="text-xs text-muted line-clamp-2">{mod.summary}</p>
                 <p className="mt-1 text-xs text-muted">
                   {mod.downloadCount.toLocaleString()} downloads
+                  {mod.versions?.length ? ` · ${mod.versions.length} version(s)` : ""}
                 </p>
               </Card>
             </div>
@@ -123,7 +140,7 @@ export default function ModpacksPage() {
                   <span>
                     {f.name} ({f.gameVersion})
                   </span>
-                  <Button size="sm" onClick={() => install(f.id, f.gameVersion)}>
+                  <Button size="sm" onClick={() => install(f.id)}>
                     Install
                   </Button>
                 </li>

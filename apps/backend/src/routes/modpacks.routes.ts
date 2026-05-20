@@ -21,7 +21,8 @@ router.get("/search", async (req: AuthRequest, res, next) => {
 router.get("/:modId/files", async (req: AuthRequest, res, next) => {
   try {
     const modId = parseInt(param(req.params.modId), 10);
-    const files = await curseForgeService.getModpackFiles(modId);
+    const slug = typeof req.query.slug === "string" ? req.query.slug : undefined;
+    const files = await curseForgeService.getModpackFiles(modId, slug);
     res.json({ files });
   } catch (e) {
     next(e);

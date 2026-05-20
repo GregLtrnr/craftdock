@@ -23,6 +23,10 @@ interface CfMod {
   latestFilesIndexes?: { fileId: number; gameVersion: string; filename: string }[];
 }
 
+/** Filled from search results — survives 403 on /mods/{id} and /files. */
+const versionsByModId = new Map<number, ModpackVersion[]>();
+const fileMetaByFileId = new Map<number, { modId: number; fileName: string }>();
+
 /**
  * CurseForge API abstraction — requires CURSEFORGE_API_KEY in .env
  * Get a key at https://console.curseforge.com/
@@ -39,13 +43,12 @@ export class CurseForgeService {
     return env.curseforgeApiKey;
   }
 
-  private headers(extra?: Record<string, string>): Record<string, string> {
+  private headers(): Record<string, string> {
     return {
       Accept: "application/json",
       "Content-Type": "application/json",
       "x-api-key": this.apiKey,
       "User-Agent": "CraftDock/1.0",
-      ...extra,
     };
   }
 
@@ -64,23 +67,21 @@ export class CurseForgeService {
     });
   }
 
-  private async request<T>(path: string, init?: RequestInit & { params?: Record<string, string> }): Promise<T> {
-    const res = await this.fetchCurseForge(path, init);
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      logger.warn("CurseForge API error", { path, status: res.status, body: body.slice(0, 200) });
-      throw new AppError(
-        res.status,
-        `CurseForge API error: ${res.statusText}${body ? ` — ${body.slice(0, 120)}` : ""}`,
-        "CURSEFORGE_ERROR"
-      );
-    }
+  private async readData<T>(res: Response): Promise<T | null> {
+    if (!res.ok) return null;
     const json = (await res.json()) as { data: T };
     return json.data;
   }
 
-  private async postRequest<T>(path: string, body: unknown): Promise<T> {
-    return this.request<T>(path, { method: "POST", body: JSON.stringify(body) });
+  private cacheVersions(modId: number, files: CfFile[]): ModpackVersion[] {
+    const versions = this.mapFiles(files);
+    if (versions.length > 0) {
+      versionsByModId.set(modId, versions);
+      for (const v of versions) {
+        fileMetaByFileId.set(v.id, { modId, fileName: v.fileName });
+      }
+    }
+    return versions;
   }
 
   private mapFiles(files: CfFile[]): ModpackVersion[] {
@@ -93,25 +94,64 @@ export class CurseForgeService {
     );
     const list = installable.length > 0 ? installable : files;
     return list.map((f) => ({
-        id: f.id,
-        name: f.displayName,
-        gameVersion: f.gameVersions[0] ?? "unknown",
-        fileName: f.fileName,
-        downloadUrl: f.downloadUrl ?? "",
-      }));
+      id: f.id,
+      name: f.displayName,
+      gameVersion: f.gameVersions[0] ?? "unknown",
+      fileName: f.fileName,
+      downloadUrl: f.downloadUrl ?? "",
+    }));
+  }
+
+  private versionsFromIndexes(modId: number, mod: CfMod): ModpackVersion[] {
+    if (!mod.latestFilesIndexes?.length) return [];
+    return mod.latestFilesIndexes.map((i) => ({
+      id: i.fileId,
+      name: i.filename,
+      gameVersion: i.gameVersion,
+      fileName: i.filename,
+      downloadUrl: "",
+    }));
+  }
+
+  private async resolveMod(modId: number, slug?: string): Promise<CfMod | null> {
+    const postRes = await this.fetchCurseForge("/mods", {
+      method: "POST",
+      body: JSON.stringify({ modIds: [modId] }),
+    });
+    const fromPost = await this.readData<CfMod[]>(postRes);
+    if (fromPost?.[0]) return fromPost[0];
+
+    if (slug) {
+      const searchRes = await this.fetchCurseForge("/mods/search", {
+        params: { gameId: "432", classId: "4471", slug },
+      });
+      const fromSlug = await this.readData<CfMod[]>(searchRes);
+      if (fromSlug?.[0]) return fromSlug[0];
+    }
+
+    const getRes = await this.fetchCurseForge(`/mods/${modId}`);
+    return this.readData<CfMod>(getRes);
+  }
+
+  private extractFilesFromMod(mod: CfMod): CfFile[] {
+    if (mod.latestFiles?.length) return mod.latestFiles;
+    return (mod.latestFilesIndexes ?? []).map((i) => ({
+      id: i.fileId,
+      displayName: i.filename,
+      gameVersions: [i.gameVersion],
+      fileName: i.filename,
+    }));
+  }
+
+  private forgeCdnUrl(fileId: number, fileName: string): string {
+    const folder = Math.floor(fileId / 1000);
+    const leaf = fileId % 1000;
+    const encoded = encodeURIComponent(fileName);
+    return `https://mediafiles.forgecdn.net/files/${folder}/${leaf}/${encoded}`;
   }
 
   async searchModpacks(query: string, index = 0, pageSize = 20): Promise<ModpackSearchResult[]> {
-    const data = await this.request<
-      {
-        id: number;
-        name: string;
-        slug: string;
-        summary: string;
-        downloadCount: number;
-        logo?: { thumbnailUrl: string };
-      }[]
-    >("/mods/search", {
+    const res = await this.fetchCurseForge("/mods/search", {
       params: {
         gameId: "432",
         classId: "4471",
@@ -122,85 +162,141 @@ export class CurseForgeService {
         sortOrder: "desc",
       },
     });
-
-    return data.map((m) => ({
-      id: m.id,
-      name: m.name,
-      slug: m.slug,
-      summary: m.summary,
-      downloadCount: m.downloadCount,
-      logoUrl: m.logo?.thumbnailUrl,
-    }));
-  }
-
-  /**
-   * List installable versions. Tries /files first; on 403 uses /mods/{id} latestFiles
-   * (some API keys can search but not list full file history).
-   */
-  async getModpackFiles(modId: number): Promise<ModpackVersion[]> {
-    const res = await this.fetchCurseForge(`/mods/${modId}/files`, {
-      params: { pageSize: "50", index: "0" },
-    });
-
-    if (res.ok) {
-      const json = (await res.json()) as { data: CfFile[] };
-      const mapped = this.mapFiles(json.data);
-      if (mapped.length > 0) return mapped;
-    } else if (res.status !== 403 && res.status !== 404) {
+    if (!res.ok) {
       const body = await res.text().catch(() => "");
       throw new AppError(
         res.status,
         `CurseForge API error: ${res.statusText}${body ? ` — ${body.slice(0, 120)}` : ""}`,
         "CURSEFORGE_ERROR"
       );
-    } else {
-      logger.info("CurseForge /files restricted, using mod latestFiles fallback", {
-        modId,
-        status: res.status,
-      });
     }
 
-    const mod = await this.request<CfMod>(`/mods/${modId}`);
-    let files = mod.latestFiles ?? [];
+    const data = ((await res.json()) as { data: CfMod[] }).data;
 
-    if (files.length === 0 && mod.latestFilesIndexes?.length) {
-      const fileIds = mod.latestFilesIndexes.map((i) => i.fileId);
-      files = await this.postRequest<CfFile[]>("/mods/files", { fileIds });
-    }
+    return data.map((m) => {
+      const rawFiles = this.extractFilesFromMod(m);
+      const versions =
+        rawFiles.length > 0
+          ? this.cacheVersions(m.id, rawFiles)
+          : this.versionsFromIndexes(m.id, m);
 
-    const mapped = this.mapFiles(files);
-    if (mapped.length === 0) {
+      if (versions.length > 0) {
+        versionsByModId.set(m.id, versions);
+        for (const v of versions) {
+          fileMetaByFileId.set(v.id, { modId: m.id, fileName: v.fileName });
+        }
+      }
+
+      return {
+        id: m.id,
+        name: m.name,
+        slug: m.slug,
+        summary: (m as CfMod & { summary?: string }).summary ?? "",
+        downloadCount: (m as CfMod & { downloadCount?: number }).downloadCount ?? 0,
+        logoUrl: (m as CfMod & { logo?: { thumbnailUrl: string } }).logo?.thumbnailUrl,
+        versions: versions.length > 0 ? versions : undefined,
+      };
+    });
+  }
+
+  async getModpackFiles(modId: number, slug?: string): Promise<ModpackVersion[]> {
+    const cached = versionsByModId.get(modId);
+    if (cached?.length) return cached;
+
+    const listRes = await this.fetchCurseForge(`/mods/${modId}/files`, {
+      params: { pageSize: "50", index: "0" },
+    });
+    if (listRes.ok) {
+      const files = ((await listRes.json()) as { data: CfFile[] }).data;
+      const mapped = this.cacheVersions(modId, files);
+      if (mapped.length > 0) return mapped;
+    } else if (listRes.status !== 403 && listRes.status !== 404) {
+      const body = await listRes.text().catch(() => "");
       throw new AppError(
-        404,
-        "No installable versions found for this modpack",
-        "MODPACK_FILES_NOT_FOUND"
+        listRes.status,
+        `CurseForge API error: ${listRes.statusText}${body ? ` — ${body.slice(0, 120)}` : ""}`,
+        "CURSEFORGE_ERROR"
       );
     }
-    return mapped;
+
+    const mod = await this.resolveMod(modId, slug);
+    if (mod) {
+      let files = this.extractFilesFromMod(mod);
+      if (files.length === 0) {
+        const fromIndexes = this.versionsFromIndexes(modId, mod);
+        if (fromIndexes.length > 0) {
+          versionsByModId.set(modId, fromIndexes);
+          return fromIndexes;
+        }
+      }
+
+      if (files.length > 0 && !mod.latestFiles?.length) {
+        const detailRes = await this.fetchCurseForge("/mods/files", {
+          method: "POST",
+          body: JSON.stringify({ fileIds: files.map((f) => f.id) }),
+        });
+        const detailed = await this.readData<CfFile[]>(detailRes);
+        if (detailed?.length) files = detailed;
+      }
+
+      const mapped = this.cacheVersions(modId, files);
+      if (mapped.length > 0) return mapped;
+    }
+
+    throw new AppError(
+      404,
+      "No versions available. Run a new search, then select the modpack again (versions are loaded from search results).",
+      "MODPACK_FILES_NOT_FOUND"
+    );
   }
 
   async downloadModpackFile(modId: number, fileId: number): Promise<{ buffer: Buffer; fileName: string }> {
-    const files = await this.postRequest<CfFile[]>("/mods/files", { fileIds: [fileId] });
-    const file = files[0];
-    if (!file) throw new AppError(404, "Modpack file not found", "MODPACK_FILE_NOT_FOUND");
+    const meta = fileMetaByFileId.get(fileId);
+    const fileName = meta?.fileName;
 
-    let downloadUrl = file.downloadUrl;
-    if (!downloadUrl) {
-      downloadUrl = await this.request<string>(`/mods/${modId}/files/${fileId}/download-url`);
-    }
-
-    const res = await fetch(downloadUrl, {
-      headers: { "x-api-key": this.apiKey, "User-Agent": "CraftDock/1.0" },
+    const detailRes = await this.fetchCurseForge("/mods/files", {
+      method: "POST",
+      body: JSON.stringify({ fileIds: [fileId] }),
     });
-    if (!res.ok) {
-      throw new AppError(502, `Failed to download modpack file: ${res.statusText}`);
+    const files = await this.readData<CfFile[]>(detailRes);
+    const file = files?.[0];
+    const resolvedName = file?.fileName ?? fileName;
+    if (!resolvedName) {
+      throw new AppError(404, "Modpack file not found — select the modpack from search first", "MODPACK_FILE_NOT_FOUND");
     }
-    const buffer = Buffer.from(await res.arrayBuffer());
-    return { buffer, fileName: file.fileName };
+
+    const urls: string[] = [];
+    if (file?.downloadUrl) urls.push(file.downloadUrl);
+
+    const urlRes = await this.fetchCurseForge(`/mods/${modId}/files/${fileId}/download-url`);
+    const apiUrl = await this.readData<string>(urlRes);
+    if (apiUrl) urls.push(apiUrl);
+
+    urls.push(this.forgeCdnUrl(fileId, resolvedName));
+    urls.push(
+      `https://edge.forgecdn.net/files/${Math.floor(fileId / 1000)}/${fileId % 1000}/${encodeURIComponent(resolvedName)}`
+    );
+
+    let lastError = "";
+    for (const url of urls) {
+      const res = await fetch(url, {
+        headers: { "x-api-key": this.apiKey, "User-Agent": "CraftDock/1.0" },
+        redirect: "follow",
+      });
+      if (res.ok) {
+        const buffer = Buffer.from(await res.arrayBuffer());
+        return { buffer, fileName: resolvedName };
+      }
+      lastError = `${res.status} ${res.statusText}`;
+      logger.warn("Modpack download attempt failed", { url: url.slice(0, 80), lastError });
+    }
+
+    throw new AppError(502, `Failed to download modpack file: ${lastError}`);
   }
 
   async cacheModpack(modId: number): Promise<void> {
-    const mod = await this.request<{ id: number; name: string; slug: string }>(`/mods/${modId}`);
+    const mod = await this.resolveMod(modId);
+    if (!mod) return;
     await prisma.modpackCache.upsert({
       where: { curseId: modId },
       create: { curseId: modId, name: mod.name, slug: mod.slug, data: mod as object },

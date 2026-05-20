@@ -45,6 +45,8 @@ export interface ModpackSearchResult {
   summary: string;
   downloadCount: number;
   logoUrl?: string;
+  /** Present when CurseForge search returns latestFiles (avoids a separate /files call). */
+  versions?: ModpackVersion[];
 }
 
 export interface ModpackVersion {
