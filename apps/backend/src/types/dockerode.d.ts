@@ -12,6 +12,7 @@ declare module "dockerode" {
     start(): Promise<void>;
     stop(options?: { t?: number }): Promise<void>;
     kill(): Promise<void>;
+    remove(options?: { force?: boolean; v?: boolean }): Promise<void>;
     restart(): Promise<void>;
     logs(options: Record<string, unknown>): Promise<NodeJS.ReadableStream>;
     attach(options: Record<string, unknown>): Promise<NodeJS.ReadWriteStream>;

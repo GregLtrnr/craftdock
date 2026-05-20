@@ -47,13 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    await fetchCsrf();
     const data = await api.post<{ user: User }>("/api/auth/login", { email, password });
     setUser(data.user);
   };
 
   const register = async (email: string, username: string, password: string) => {
-    await fetchCsrf();
     const data = await api.post<{ user: User }>("/api/auth/register", {
       email,
       username,

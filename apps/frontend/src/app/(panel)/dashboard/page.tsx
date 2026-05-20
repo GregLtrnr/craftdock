@@ -13,28 +13,46 @@ export default function DashboardPage() {
   const [statsMap, setStatsMap] = useState<Record<string, ServerStats>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api
-      .get<{ servers: Server[] }>("/api/servers")
-      .then(async ({ servers }) => {
-        setServers(servers);
-        const stats: Record<string, ServerStats> = {};
-        await Promise.all(
-          servers.map(async (s) => {
-            try {
-              const { stats: st } = await api.get<{ stats: ServerStats }>(
-                `/api/servers/${s.id}/stats`
-              );
-              stats[s.id] = st;
-            } catch {
-              /* ignore */
-            }
-          })
-        );
-        setStatsMap(stats);
+  const loadServers = async () => {
+    const { servers: list } = await api.get<{ servers: Server[] }>("/api/servers");
+    setServers(list);
+    const stats: Record<string, ServerStats> = {};
+    await Promise.all(
+      list.map(async (s) => {
+        try {
+          const { stats: st } = await api.get<{ stats: ServerStats }>(
+            `/api/servers/${s.id}/stats`
+          );
+          stats[s.id] = st;
+        } catch {
+          /* ignore */
+        }
       })
+    );
+    setStatsMap(stats);
+  };
+
+  useEffect(() => {
+    loadServers()
+      .catch(() => setServers([]))
       .finally(() => setLoading(false));
   }, []);
+
+  const deleteServer = async (server: Server) => {
+    if (
+      !confirm(
+        `Delete "${server.name}"? All files will be removed. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.delete(`/api/servers/${server.id}`);
+      await loadServers();
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  };
 
   return (
     <div>
@@ -68,7 +86,12 @@ export default function DashboardPage() {
           variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
         >
           {servers.map((server) => (
-            <ServerCard key={server.id} server={server} stats={statsMap[server.id]} />
+            <ServerCard
+              key={server.id}
+              server={server}
+              stats={statsMap[server.id]}
+              onDelete={deleteServer}
+            />
           ))}
         </motion.div>
       )}

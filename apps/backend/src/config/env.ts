@@ -28,7 +28,7 @@ export const env = {
   dockerImage: process.env.DOCKER_IMAGE ?? "itzg/minecraft-server:latest",
   frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:3000",
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? "900000", 10),
-  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX ?? "100", 10),
+  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX ?? "500", 10),
   adminEmail: process.env.ADMIN_EMAIL ?? "admin@localhost",
   adminPassword: process.env.ADMIN_PASSWORD ?? "changeme123",
   adminUsername: process.env.ADMIN_USERNAME ?? "admin",

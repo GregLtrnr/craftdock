@@ -24,7 +24,9 @@ export async function fetchCsrf(): Promise<string> {
 }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  if (!csrfToken && options.method && options.method !== "GET") {
+  const method = (options.method ?? "GET").toUpperCase();
+  const needsCsrf = method !== "GET" && method !== "HEAD";
+  if (needsCsrf && !csrfToken) {
     await fetchCsrf();
   }
 
@@ -32,7 +34,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     "Content-Type": "application/json",
     ...(options.headers ?? {}),
   };
-  if (csrfToken && options.method && options.method !== "GET") {
+  if (needsCsrf && csrfToken) {
     (headers as Record<string, string>)["x-csrf-token"] = csrfToken;
   }
 
@@ -44,10 +46,13 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error ?? "Request failed");
+    const msg = err.error ?? res.statusText;
+    throw new Error(err.code ? `${msg} (${err.code})` : msg);
   }
 
-  if (res.status === 204) return {} as T;
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return {} as T;
+  }
   return res.json();
 }
 

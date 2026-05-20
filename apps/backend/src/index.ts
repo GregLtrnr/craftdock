@@ -48,11 +48,17 @@ async function bootstrap() {
   app.use(compression());
   app.use(cookieParser());
   app.use(express.json({ limit: "2mb" }));
+  // Only limit writes — panel polls GET /stats every few seconds and would hit 429 otherwise
   app.use(
     rateLimit({
       windowMs: env.rateLimitWindowMs,
       max: env.rateLimitMax,
       standardHeaders: true,
+      skip: (req) =>
+        req.method === "GET" ||
+        req.method === "HEAD" ||
+        req.path === "/api/auth/csrf" ||
+        req.path === "/api/system/health",
     })
   );
 

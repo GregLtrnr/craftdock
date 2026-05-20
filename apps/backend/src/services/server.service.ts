@@ -7,8 +7,10 @@ import { AppError, assertFound } from "../lib/errors";
 import { getAdapter } from "../adapters";
 import { createRuntime, getRuntime, removeRuntime } from "../runtime/runtime-manager";
 import type { CreateServerInput, UpdateServerInput } from "@craftdock/shared";
+import Docker from "dockerode";
 import { installModpackToServer } from "./modpack.service";
 import type { ModpackSource } from "@craftdock/shared";
+import { logger } from "../lib/logger";
 export async function listServers(userId: string, role: string) {
   const where =
     role === "ADMIN"
@@ -194,9 +196,39 @@ export async function killServer(serverId: string): Promise<void> {
 
 export async function deleteServer(serverId: string): Promise<void> {
   const server = await getServer(serverId);
-  await killServer(serverId);
-  await fs.rm(server.dataPath, { recursive: true, force: true });
+
+  try {
+    await killServer(serverId);
+  } catch (err) {
+    logger.warn("Kill before delete failed", { serverId, err: (err as Error).message });
+  }
+
+  if (server.containerId && env.dockerEnabled) {
+    try {
+      const docker = new Docker();
+      const container = docker.getContainer(server.containerId);
+      await container.stop({ t: 5 }).catch(() => undefined);
+      await container.remove({ force: true }).catch(() => undefined);
+    } catch (err) {
+      logger.warn("Docker cleanup on delete failed", {
+        serverId,
+        err: (err as Error).message,
+      });
+    }
+  }
+
+  try {
+    await fs.rm(server.dataPath, { recursive: true, force: true, maxRetries: 3 });
+  } catch (err) {
+    logger.warn("Could not remove server data directory", {
+      serverId,
+      dataPath: server.dataPath,
+      err: (err as Error).message,
+    });
+  }
+
   await prisma.server.delete({ where: { id: serverId } });
+  logger.info("Server deleted", { serverId, name: server.name });
 }
 
 export async function updateServer(serverId: string, input: UpdateServerInput) {

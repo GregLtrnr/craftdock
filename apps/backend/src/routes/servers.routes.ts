@@ -54,7 +54,7 @@ router.delete("/:id", async (req: AuthRequest, res, next) => {
   try {
     await requireServerAccess(req.user!.userId, param(req.params.id), req.user!.role, "manage");
     await serverService.deleteServer(param(req.params.id));
-    res.status(204).send();
+    res.json({ ok: true });
   } catch (e) {
     next(e);
   }

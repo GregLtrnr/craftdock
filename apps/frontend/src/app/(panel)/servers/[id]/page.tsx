@@ -69,6 +69,7 @@ export default function ServerDetailPage({
     try {
       await api.delete(`/api/servers/${id}`);
       router.push("/dashboard");
+      router.refresh();
     } catch (err) {
       alert((err as Error).message);
       setDeleting(false);
