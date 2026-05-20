@@ -36,4 +36,6 @@ export const env = {
   backupCron: process.env.BACKUP_CRON ?? "0 3 * * *",
   nodeId: process.env.NODE_ID ?? "local",
   isDev: (process.env.NODE_ENV ?? "development") !== "production",
+  /** Set COOKIE_SECURE=true only behind HTTPS */
+  cookieSecure: process.env.COOKIE_SECURE === "true",
 };

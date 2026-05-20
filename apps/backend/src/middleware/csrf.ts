@@ -21,7 +21,7 @@ export function issueCsrfToken(_req: Request, res: Response): void {
   const token = crypto.randomBytes(32).toString("hex");
   res.cookie("craftdock_csrf", token, {
     httpOnly: false,
-    secure: env.nodeEnv === "production",
+    secure: env.cookieSecure,
     sameSite: "strict",
     maxAge: 24 * 60 * 60 * 1000,
   });

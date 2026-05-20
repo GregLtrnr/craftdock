@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { getApiBase } from "@/lib/api-base";
 
 /**
  * Live Minecraft console via xterm + Socket.IO.
@@ -48,8 +49,7 @@ export function ServerTerminal({ serverId }: { serverId: string }) {
 
       const tokenMatch = document.cookie.match(/craftdock_token=([^;]+)/);
 
-      // Same origin — Next rewrites /socket.io → backend
-      socket = io({
+      socket = io(getApiBase(), {
         path: "/socket.io",
         withCredentials: true,
         auth: { token: tokenMatch?.[1] },

@@ -41,7 +41,7 @@ async function bootstrap() {
   app.use(helmet({ contentSecurityPolicy: env.isDev ? false : undefined }));
   app.use(
     cors({
-      origin: env.frontendUrl,
+      origin: [env.frontendUrl, env.frontendUrl.replace(/:3000$/, ":4000")],
       credentials: true,
     })
   );

@@ -36,6 +36,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-change-me-session}
       CSRF_SECRET: ${CSRF_SECRET:-change-me-csrf}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       DATA_DIR: /var/lib/craftdock/servers
       BACKUP_DIR: /var/lib/craftdock/backups
       JAVA_HOME: /opt/java-home

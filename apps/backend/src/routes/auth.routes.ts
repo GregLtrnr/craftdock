@@ -3,6 +3,7 @@ import { registerSchema, loginSchema } from "@craftdock/shared";
 import * as authService from "../services/auth.service";
 import { issueCsrfToken } from "../middleware/csrf";
 import { authenticate, type AuthRequest } from "../middleware/auth";
+import { env } from "../config/env";
 
 const router: IRouter = Router();
 
@@ -14,7 +15,7 @@ router.post("/register", async (req, res, next) => {
     const result = await authService.register(input);
     res.cookie("craftdock_token", result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: env.cookieSecure,
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -33,7 +34,7 @@ router.post("/login", async (req, res, next) => {
     });
     res.cookie("craftdock_token", result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: env.cookieSecure,
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
