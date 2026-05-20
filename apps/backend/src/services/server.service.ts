@@ -12,6 +12,29 @@ import { installModpackToServer } from "./modpack.service";
 import type { ModpackSource } from "@craftdock/shared";
 import { logger } from "../lib/logger";
 import { syncServerRuntimeConfig, readServerProperties, isTcpPortOpen } from "../lib/server-config";
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function waitForGamePort(
+  serverId: string,
+  port: number,
+  runtime: { isRunning(): boolean },
+  timeoutMs = 120_000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!runtime.isRunning()) {
+      throw new AppError(500, "Server process exited during startup — check console logs", "STARTUP_CRASH");
+    }
+    if (await isTcpPortOpen(port)) return;
+    await sleep(2000);
+  }
+  throw new AppError(
+    500,
+    `Server process running but port ${port} is not listening — check server.properties and console`,
+    "PORT_NOT_LISTENING"
+  );
+}
 export async function listServers(userId: string, role: string) {
   const where =
     role === "ADMIN"
@@ -195,6 +218,7 @@ export async function startServer(serverId: string): Promise<void> {
   );
 
   await runtime.start();
+  await waitForGamePort(serverId, server.port, runtime);
   await prisma.server.update({
     where: { id: serverId },
     data: { status: "RUNNING", startedAt: new Date() },

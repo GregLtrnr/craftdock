@@ -6,12 +6,14 @@ import type { ServerStats } from "@craftdock/shared";
 import { logger } from "../lib/logger";
 import { sanitizeConsoleCommand } from "../lib/sanitize";
 import { env } from "../config/env";
+import { prisma } from "../lib/prisma";
 
 type OutputCallback = (data: string, type: "stdout" | "stderr") => void;
 
 export class NativeRuntime implements RuntimeInstance {
   private process: ChildProcessWithoutNullStreams | null = null;
   private startedAt: number | null = null;
+  private stoppingIntentionally = false;
   private outputCallbacks = new Set<OutputCallback>();
   private scrollback: string[] = [];
   private readonly maxScrollback = 5000;
@@ -40,7 +42,25 @@ export class NativeRuntime implements RuntimeInstance {
   }
 
   isRunning(): boolean {
-    return this.process !== null && !this.process.killed;
+    return this.process !== null && !this.process.killed && this.process.exitCode === null;
+  }
+
+  private async onProcessExit(code: number | null): Promise<void> {
+    this.emit(`\r\n[CraftDock] Process exited with code ${code}\r\n`, "stdout");
+    this.process = null;
+
+    const { removeRuntime } = await import("./runtime-manager");
+    removeRuntime(this.serverId);
+
+    const status = this.stoppingIntentionally || code === 0 ? "STOPPED" : "CRASHED";
+    this.stoppingIntentionally = false;
+
+    await prisma.server.update({
+      where: { id: this.serverId },
+      data: { status },
+    }).catch(() => undefined);
+
+    logger.info("Native server process exited", { serverId: this.serverId, code, status });
   }
 
   async start(): Promise<void> {
@@ -63,11 +83,11 @@ export class NativeRuntime implements RuntimeInstance {
     });
 
     this.startedAt = Date.now();
+    this.stoppingIntentionally = false;
     this.process.stdout.on("data", (buf) => this.emit(buf.toString(), "stdout"));
     this.process.stderr.on("data", (buf) => this.emit(buf.toString(), "stderr"));
     this.process.on("exit", (code) => {
-      this.emit(`\r\n[CraftDock] Process exited with code ${code}\r\n`, "stdout");
-      this.process = null;
+      void this.onProcessExit(code);
     });
     this.process.on("error", (err) => {
       logger.error("Native runtime error", { serverId: this.serverId, err: err.message });
@@ -78,6 +98,7 @@ export class NativeRuntime implements RuntimeInstance {
 
   async stop(): Promise<void> {
     if (!this.process) return;
+    this.stoppingIntentionally = true;
     await this.sendCommand("stop");
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
@@ -92,6 +113,7 @@ export class NativeRuntime implements RuntimeInstance {
   }
 
   async kill(): Promise<void> {
+    this.stoppingIntentionally = true;
     this.process?.kill("SIGKILL");
     this.process = null;
   }

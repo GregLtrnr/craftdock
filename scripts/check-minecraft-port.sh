@@ -15,8 +15,8 @@ fi
 
 echo "=== Server port $PORT ==="
 echo ""
-echo "--- Inside backend container (should listen if server RUNNING) ---"
-docker compose exec backend sh -lc "ss -tlnp 2>/dev/null | grep ':$PORT ' || netstat -tlnp 2>/dev/null | grep ':$PORT ' || echo 'NOT listening inside backend'"
+echo "--- Inside backend container ---"
+docker compose exec -T backend sh -lc "ss -tln 2>/dev/null | grep ':$PORT ' || netstat -tln 2>/dev/null | grep ':$PORT ' || echo 'NOT listening inside backend'"
 
 echo ""
 echo "--- On Ubuntu host (Docker publish) ---"
@@ -32,7 +32,8 @@ docker compose exec postgres psql -U craftdock -d craftdock -t -A -c \
   "SELECT \"dataPath\" FROM \"Server\" WHERE port=$PORT LIMIT 1;" | while read -r dp; do
   [[ -z "$dp" ]] && continue
   echo "dataPath: $dp"
-  docker compose exec backend sh -lc "grep -E '^(server-port|server-ip)=' '$dp/server.properties' 2>/dev/null || echo 'no server.properties'"
+  docker compose exec -T backend sh -lc "grep -E '^(server-port|server-ip)=' '$dp/server.properties' 2>/dev/null || echo 'no server.properties'"
+  docker compose exec -T backend sh -lc "ps aux | grep -E '[j]ava.*server.jar' || echo 'no java server process'"
 done
 
 echo ""

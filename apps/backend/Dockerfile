@@ -3,7 +3,7 @@ FROM eclipse-temurin:21-jre-jammy AS java-runtime
 
 FROM node:20-bookworm-slim AS base
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl ca-certificates bash wget unzip python3 make g++ \
+    && apt-get install -y --no-install-recommends openssl ca-certificates bash wget unzip python3 make g++ iproute2 net-tools \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=java-runtime /opt/java/openjdk /opt/java-home
 ENV JAVA_HOME=/opt/java-home
