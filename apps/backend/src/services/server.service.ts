@@ -123,11 +123,19 @@ async function installModpackServer(server: Awaited<ReturnType<typeof getServer>
     throw new Error("Modpack project and version id required");
   }
 
-  await installModpackToServer(source, projectId, versionId, server.dataPath);
+  const meta = await installModpackToServer(source, projectId, versionId, server.dataPath, {
+    port: server.port,
+    ramMb: server.ramMb,
+    javaVersion: server.javaVersion,
+  });
 
   await prisma.server.update({
     where: { id: server.id },
-    data: { status: "STOPPED", serverType: "MODPACK" },
+    data: {
+      status: "STOPPED",
+      serverType: meta.serverType ?? "MODPACK",
+      ...(meta.minecraftVersion ? { minecraftVersion: meta.minecraftVersion } : {}),
+    },
   });
 }
 

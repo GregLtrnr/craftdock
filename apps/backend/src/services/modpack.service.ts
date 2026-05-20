@@ -45,15 +45,25 @@ export async function getModpackVersions(
   return curseForgeService.getModpackFiles(modId, slug);
 }
 
+export interface ModpackInstallMeta {
+  minecraftVersion?: string;
+  serverType?: "VANILLA" | "PAPER" | "PURPUR" | "FABRIC" | "FORGE" | "NEOFORGE" | "MODPACK";
+}
+
 export async function installModpackToServer(
   source: ModpackSource,
   projectId: string,
   versionId: string,
-  dataPath: string
-): Promise<void> {
+  dataPath: string,
+  opts?: { port: number; ramMb: number; javaVersion: string }
+): Promise<ModpackInstallMeta> {
   if (source === "modrinth") {
-    await modrinthService.installVersionToServer(versionId, dataPath);
-    return;
+    if (!opts) throw new AppError(400, "Server options required for Modrinth install");
+    const result = await modrinthService.installVersionToServer(versionId, dataPath, opts);
+    if (result) {
+      return { minecraftVersion: result.minecraftVersion, serverType: result.serverType };
+    }
+    return {};
   }
   const modId = parseInt(projectId, 10);
   const fileId = parseInt(versionId, 10);
@@ -68,6 +78,7 @@ export async function installModpackToServer(
   await fs.writeFile(archivePath, buffer);
   await extractArchive(archivePath, dataPath);
   await removeFileIfExists(archivePath);
+  return {};
 }
 
 export async function getModpackSourcesStatus(): Promise<{
