@@ -376,6 +376,8 @@ function PropertiesEditor({
 }) {
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
+  const [ramMb, setRamMb] = useState(server.ramMb);
+  const [savingRam, setSavingRam] = useState(false);
 
   useEffect(() => {
     api
@@ -386,6 +388,10 @@ function PropertiesEditor({
       .catch(() => setContent(""));
   }, [serverId]);
 
+  useEffect(() => {
+    setRamMb(server.ramMb);
+  }, [server.ramMb]);
+
   const save = async () => {
     setSaving(true);
     await api.put(`/api/${serverId}/files/content`, {
@@ -395,8 +401,40 @@ function PropertiesEditor({
     setSaving(false);
   };
 
+  const applyRam = async () => {
+    setSavingRam(true);
+    try {
+      await api.patch(`/api/servers/${serverId}`, { ramMb });
+      alert("RAM updated. Restart server to apply if it is already running.");
+    } finally {
+      setSavingRam(false);
+    }
+  };
+
   return (
     <Card>
+      <h3 className="mb-2 font-medium">RAM limit</h3>
+      <p className="mb-2 text-sm text-muted">
+        {Math.floor(ramMb / 1024)} Go ({ramMb} MB)
+      </p>
+      <input
+        type="range"
+        min={512}
+        max={10 * 1024}
+        step={256}
+        value={ramMb}
+        onChange={(e) => setRamMb(parseInt(e.target.value, 10))}
+        className="w-full"
+      />
+      <div className="mt-3">
+        <Button
+          onClick={applyRam}
+          disabled={savingRam || ramMb === server.ramMb}
+        >
+          {savingRam ? "Saving RAM..." : "Apply RAM"}
+        </Button>
+      </div>
+
       <h3 className="mb-2 font-medium">Storage</h3>
       <p className="mb-4 font-mono text-xs text-muted break-all">
         {server.dataPath ?? "—"}
