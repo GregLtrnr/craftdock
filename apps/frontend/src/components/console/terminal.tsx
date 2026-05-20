@@ -52,12 +52,13 @@ export function ServerTerminal({ serverId }: { serverId: string }) {
         path: "/socket.io",
         withCredentials: true,
         transports: ["websocket", "polling"],
+        timeout: 10000,
       });
 
       socket.on("connect_error", (err: Error) => {
         term.writeln(`\x1b[31mConnection failed: ${err.message}\x1b[0m`);
         term.writeln(
-          "\x1b[33mCheck FRONTEND_URL in .env matches how you open the panel (e.g. http://192.168.1.170:3000).\x1b[0m"
+          "\x1b[33mCheck backend reachability on :4000 from your browser/network (e.g. http://192.168.1.170:4000/api/system/health).\x1b[0m"
         );
       });
 
