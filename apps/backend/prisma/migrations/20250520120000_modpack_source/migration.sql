@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Server" ADD COLUMN IF NOT EXISTS "modpackSource" TEXT;
+ALTER TABLE "Server" ADD COLUMN IF NOT EXISTS "modpackProjectId" TEXT;
+ALTER TABLE "Server" ADD COLUMN IF NOT EXISTS "modpackVersionId" TEXT;
+ALTER TABLE "Server" ADD COLUMN IF NOT EXISTS "modpackSlug" TEXT;
