@@ -78,7 +78,7 @@ export class CurseForgeService {
     if (versions.length > 0) {
       versionsByModId.set(modId, versions);
       for (const v of versions) {
-        fileMetaByFileId.set(v.id, { modId, fileName: v.fileName });
+        fileMetaByFileId.set(Number(v.id), { modId, fileName: v.fileName });
       }
     }
     return versions;
@@ -94,7 +94,7 @@ export class CurseForgeService {
     );
     const list = installable.length > 0 ? installable : files;
     return list.map((f) => ({
-      id: f.id,
+      id: String(f.id),
       name: f.displayName,
       gameVersion: f.gameVersions[0] ?? "unknown",
       fileName: f.fileName,
@@ -105,7 +105,7 @@ export class CurseForgeService {
   private versionsFromIndexes(modId: number, mod: CfMod): ModpackVersion[] {
     if (!mod.latestFilesIndexes?.length) return [];
     return mod.latestFilesIndexes.map((i) => ({
-      id: i.fileId,
+      id: String(i.fileId),
       name: i.filename,
       gameVersion: i.gameVersion,
       fileName: i.filename,
@@ -183,12 +183,13 @@ export class CurseForgeService {
       if (versions.length > 0) {
         versionsByModId.set(m.id, versions);
         for (const v of versions) {
-          fileMetaByFileId.set(v.id, { modId: m.id, fileName: v.fileName });
+          fileMetaByFileId.set(Number(v.id), { modId: m.id, fileName: v.fileName });
         }
       }
 
       return {
-        id: m.id,
+        source: "curseforge" as const,
+        id: String(m.id),
         name: m.name,
         slug: m.slug,
         summary: (m as CfMod & { summary?: string }).summary ?? "",

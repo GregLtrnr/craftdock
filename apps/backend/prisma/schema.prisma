@@ -91,6 +91,10 @@ model Server {
   modpackId        Int?
   modpackFileId    Int?
   modpackName      String?
+  modpackSource    String?
+  modpackProjectId String?
+  modpackVersionId String?
+  modpackSlug      String?
   maxPlayers       Int          @default(20)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt

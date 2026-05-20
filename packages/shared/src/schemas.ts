@@ -27,6 +27,8 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const modpackSourceSchema = z.enum(["modrinth", "curseforge"]);
+
 export const createServerSchema = z.object({
   name: z.string().min(1).max(64),
   serverType: z.enum(SERVER_TYPES),
@@ -38,6 +40,11 @@ export const createServerSchema = z.object({
   autoRestart: z.boolean().default(true),
   modpackId: z.number().int().optional(),
   modpackFileId: z.number().int().optional(),
+  modpackSource: modpackSourceSchema.optional(),
+  modpackProjectId: z.string().optional(),
+  modpackVersionId: z.string().optional(),
+  modpackSlug: z.string().optional(),
+  modpackName: z.string().optional(),
 });
 
 export const updateServerSchema = z.object({
@@ -72,11 +79,14 @@ export const modpackSearchSchema = z.object({
   query: z.string().min(1).max(128),
   page: z.coerce.number().int().min(0).default(0),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
+  source: modpackSourceSchema.default("modrinth"),
 });
 
 export const installModpackSchema = z.object({
-  modpackId: z.number().int(),
-  fileId: z.number().int(),
+  source: modpackSourceSchema.default("modrinth"),
+  projectId: z.string().min(1),
+  versionId: z.string().min(1),
+  slug: z.string().optional(),
   name: z.string().min(1).max(64),
   ramMb: z.number().int().min(MIN_RAM_MB).max(MAX_RAM_MB),
   port: z.number().int().min(1024).max(65535),

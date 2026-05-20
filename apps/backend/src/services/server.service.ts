@@ -7,9 +7,8 @@ import { AppError, assertFound } from "../lib/errors";
 import { getAdapter } from "../adapters";
 import { createRuntime, getRuntime, removeRuntime } from "../runtime/runtime-manager";
 import type { CreateServerInput, UpdateServerInput } from "@craftdock/shared";
-import { curseForgeService } from "./curseforge.service";
-import * as tar from "tar";
-
+import { installModpackToServer } from "./modpack.service";
+import type { ModpackSource } from "@craftdock/shared";
 export async function listServers(userId: string, role: string) {
   const where =
     role === "ADMIN"
@@ -58,6 +57,11 @@ export async function createServer(ownerId: string, input: CreateServerInput) {
       status: "INSTALLING",
       modpackId: input.modpackId,
       modpackFileId: input.modpackFileId,
+      modpackSource: input.modpackSource,
+      modpackProjectId: input.modpackProjectId,
+      modpackVersionId: input.modpackVersionId,
+      modpackSlug: input.modpackSlug,
+      modpackName: input.modpackName,
     },
   });
 
@@ -103,16 +107,19 @@ async function installServer(serverId: string): Promise<void> {
 }
 
 async function installModpackServer(server: Awaited<ReturnType<typeof getServer>>): Promise<void> {
-  if (!server.modpackFileId || !server.modpackId) {
-    throw new Error("Modpack id and file id required");
+  const source = (server.modpackSource as ModpackSource) ?? "modrinth";
+  const projectId =
+    server.modpackProjectId ?? (server.modpackId != null ? String(server.modpackId) : null);
+  const versionId =
+    server.modpackVersionId ??
+    (server.modpackFileId != null ? String(server.modpackFileId) : null);
+
+  if (!projectId || !versionId) {
+    throw new Error("Modpack project and version id required");
   }
-  const { buffer, fileName } = await curseForgeService.downloadModpackFile(
-    server.modpackId,
-    server.modpackFileId
-  );
-  const zipPath = path.join(server.dataPath, fileName);
-  await fs.writeFile(zipPath, buffer);
-  await tar.x({ file: zipPath, cwd: server.dataPath });
+
+  await installModpackToServer(source, projectId, versionId, server.dataPath);
+
   await prisma.server.update({
     where: { id: server.id },
     data: { status: "STOPPED", serverType: "MODPACK" },

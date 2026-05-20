@@ -1,36 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-
-interface ModpackVersion {
-  id: number;
-  name: string;
-  gameVersion: string;
-  fileName?: string;
-}
-
-interface Modpack {
-  id: number;
-  name: string;
-  slug: string;
-  summary: string;
-  downloadCount: number;
-  logoUrl?: string;
-  versions?: ModpackVersion[];
-}
+import type { ModpackSearchResult, ModpackSource, ModpackVersion } from "@craftdock/shared";
 
 export default function ModpacksPage() {
+  const [source, setSource] = useState<ModpackSource>("modrinth");
+  const [cfAvailable, setCfAvailable] = useState(false);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Modpack[]>([]);
-  const [selected, setSelected] = useState<Modpack | null>(null);
+  const [results, setResults] = useState<ModpackSearchResult[]>([]);
+  const [selected, setSelected] = useState<ModpackSearchResult | null>(null);
   const [files, setFiles] = useState<ModpackVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [filesLoading, setFilesLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    api
+      .get<{ modrinth: { available: boolean }; curseforge: { available: boolean; configured: boolean } }>(
+        "/api/modpacks/status"
+      )
+      .then((s) => setCfAvailable(s.curseforge.available))
+      .catch(() => setCfAvailable(false));
+  }, []);
 
   const search = async () => {
     setLoading(true);
@@ -38,8 +33,8 @@ export default function ModpacksPage() {
     setSelected(null);
     setFiles([]);
     try {
-      const { results: r } = await api.get<{ results: Modpack[] }>(
-        `/api/modpacks/search?query=${encodeURIComponent(query)}`
+      const { results: r } = await api.get<{ results: ModpackSearchResult[] }>(
+        `/api/modpacks/search?query=${encodeURIComponent(query)}&source=${source}`
       );
       setResults(r);
     } catch (err) {
@@ -49,7 +44,7 @@ export default function ModpacksPage() {
     }
   };
 
-  const selectModpack = async (mod: Modpack) => {
+  const selectModpack = async (mod: ModpackSearchResult) => {
     setSelected(mod);
     setError("");
 
@@ -62,7 +57,7 @@ export default function ModpacksPage() {
     setFilesLoading(true);
     try {
       const { files: f } = await api.get<{ files: ModpackVersion[] }>(
-        `/api/modpacks/${mod.id}/files?slug=${encodeURIComponent(mod.slug)}`
+        `/api/modpacks/${encodeURIComponent(mod.id)}/versions?source=${mod.source}&slug=${encodeURIComponent(mod.slug)}`
       );
       setFiles(f);
     } catch (err) {
@@ -72,12 +67,15 @@ export default function ModpacksPage() {
     }
   };
 
-  const install = async (fileId: number) => {
+  const install = async (versionId: string) => {
+    if (!selected) return;
     const port = 25566 + Math.floor(Math.random() * 100);
     await api.post("/api/modpacks/install", {
-      modpackId: selected!.id,
-      fileId,
-      name: `${selected!.name} Server`,
+      source: selected.source,
+      projectId: selected.id,
+      versionId,
+      slug: selected.slug,
+      name: `${selected.name} Server`,
       ramMb: 4096,
       port,
       runtimeMode: "NATIVE",
@@ -87,8 +85,35 @@ export default function ModpacksPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold">CurseForge Modpacks</h1>
-      <p className="text-muted">Search and install modpacks in one click</p>
+      <h1 className="text-3xl font-bold">Modpacks</h1>
+      <p className="text-muted">
+        Modrinth by default — no API key. CurseForge is optional if your key still works.
+      </p>
+
+      <div className="mt-4 flex gap-2">
+        <Button
+          variant={source === "modrinth" ? "default" : "secondary"}
+          size="sm"
+          onClick={() => setSource("modrinth")}
+        >
+          Modrinth
+        </Button>
+        <Button
+          variant={source === "curseforge" ? "default" : "secondary"}
+          size="sm"
+          onClick={() => setSource("curseforge")}
+          disabled={!cfAvailable}
+          title={cfAvailable ? undefined : "CurseForge API unavailable — check CURSEFORGE_API_KEY"}
+        >
+          CurseForge
+        </Button>
+      </div>
+
+      {!cfAvailable && source === "curseforge" && (
+        <p className="mt-2 text-sm text-muted">
+          CurseForge API blocked or key missing. Use Modrinth or regenerate a key at console.curseforge.com.
+        </p>
+      )}
 
       <div className="mt-6 flex gap-2">
         <Input
@@ -108,7 +133,7 @@ export default function ModpacksPage() {
         <div className="space-y-2">
           {results.map((mod) => (
             <div
-              key={mod.id}
+              key={`${mod.source}-${mod.id}`}
               role="button"
               tabIndex={0}
               className="cursor-pointer"

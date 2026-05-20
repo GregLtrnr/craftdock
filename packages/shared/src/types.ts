@@ -38,19 +38,22 @@ export interface FileEntry {
   modifiedAt: string;
 }
 
+export type ModpackSource = "modrinth" | "curseforge";
+
 export interface ModpackSearchResult {
-  id: number;
+  source: ModpackSource;
+  id: string;
   name: string;
   slug: string;
   summary: string;
   downloadCount: number;
   logoUrl?: string;
-  /** Present when CurseForge search returns latestFiles (avoids a separate /files call). */
+  /** CurseForge only — versions from search when API allows */
   versions?: ModpackVersion[];
 }
 
 export interface ModpackVersion {
-  id: number;
+  id: string;
   name: string;
   gameVersion: string;
   fileName: string;
