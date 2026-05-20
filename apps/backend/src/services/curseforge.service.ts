@@ -57,10 +57,10 @@ export class CurseForgeService {
     if (init?.params) {
       Object.entries(init.params).forEach(([k, v]) => url.searchParams.set(k, v));
     }
-    const { params: _params, ...fetchInit } = init ?? {};
+    const { params: _params, headers: _headers, ...fetchInit } = init ?? {};
     return fetch(url.toString(), {
       ...fetchInit,
-      headers: this.headers(fetchInit.headers),
+      headers: this.headers(),
     });
   }
 
