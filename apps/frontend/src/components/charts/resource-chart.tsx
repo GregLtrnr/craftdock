@@ -21,8 +21,8 @@ export function ResourceChart({
   label: string;
 }) {
   return (
-    <div className="h-48 w-full">
-      <p className="mb-2 text-xs text-muted">{label}</p>
+    <div className="h-36 w-full">
+      <p className="mb-2 text-xs font-medium text-muted">{label}</p>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data}>
           <defs>

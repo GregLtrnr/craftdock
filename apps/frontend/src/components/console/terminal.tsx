@@ -123,7 +123,7 @@ export function ServerTerminal({ serverId }: { serverId: string }) {
 
   return (
     <div className="space-y-2">
-      <div className="h-[480px] overflow-hidden rounded-2xl border border-border bg-background">
+      <div className="h-[min(520px,calc(100vh-280px))] min-h-[360px] overflow-hidden rounded-2xl border border-border bg-background">
         <div ref={termContainerRef} className="h-full w-full p-2" />
       </div>
 
