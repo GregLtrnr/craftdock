@@ -21,6 +21,7 @@ export default function ModpacksPage() {
   const [selected, setSelected] = useState<Modpack | null>(null);
   const [files, setFiles] = useState<{ id: number; name: string; gameVersion: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [filesLoading, setFilesLoading] = useState(false);
   const [error, setError] = useState("");
 
   const search = async () => {
@@ -40,10 +41,19 @@ export default function ModpacksPage() {
 
   const selectModpack = async (mod: Modpack) => {
     setSelected(mod);
-    const { files: f } = await api.get<{ files: { id: number; name: string; gameVersion: string }[] }>(
-      `/api/modpacks/${mod.id}/files`
-    );
-    setFiles(f);
+    setFiles([]);
+    setFilesLoading(true);
+    setError("");
+    try {
+      const { files: f } = await api.get<{
+        files: { id: number; name: string; gameVersion: string }[];
+      }>(`/api/modpacks/${mod.id}/files`);
+      setFiles(f);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setFilesLoading(false);
+    }
   };
 
   const install = async (fileId: number, gameVersion: string) => {
@@ -103,6 +113,10 @@ export default function ModpacksPage() {
         {selected && (
           <Card>
             <h3 className="font-semibold">{selected.name} — Versions</h3>
+            {filesLoading && <p className="mt-4 text-sm text-muted">Loading versions…</p>}
+            {!filesLoading && files.length === 0 && !error && (
+              <p className="mt-4 text-sm text-muted">No versions found.</p>
+            )}
             <ul className="mt-4 space-y-2">
               {files.map((f) => (
                 <li key={f.id} className="flex items-center justify-between text-sm">

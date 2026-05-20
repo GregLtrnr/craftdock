@@ -103,8 +103,13 @@ async function installServer(serverId: string): Promise<void> {
 }
 
 async function installModpackServer(server: Awaited<ReturnType<typeof getServer>>): Promise<void> {
-  if (!server.modpackFileId) throw new Error("Modpack file ID required");
-  const { buffer, fileName } = await curseForgeService.downloadModpackFile(server.modpackFileId);
+  if (!server.modpackFileId || !server.modpackId) {
+    throw new Error("Modpack id and file id required");
+  }
+  const { buffer, fileName } = await curseForgeService.downloadModpackFile(
+    server.modpackId,
+    server.modpackFileId
+  );
   const zipPath = path.join(server.dataPath, fileName);
   await fs.writeFile(zipPath, buffer);
   await tar.x({ file: zipPath, cwd: server.dataPath });
