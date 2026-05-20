@@ -1,18 +1,23 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+/**
+ * API client — always uses relative URLs in the browser (/api/...).
+ * That way login works from any device on your LAN (e.g. http://192.168.1.170:3000),
+ * not only on the server machine. Next.js rewrites /api → backend (see API_PROXY_URL).
+ */
+function apiBase(): string {
+  if (typeof window !== "undefined") return "";
+  return process.env.API_PROXY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
+}
 
 let csrfToken: string | null = null;
 
 export async function fetchCsrf(): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/auth/csrf`, { credentials: "include" });
+  const res = await fetch(`${apiBase()}/api/auth/csrf`, { credentials: "include" });
   const data = await res.json();
   csrfToken = data.csrfToken;
   return csrfToken!;
 }
 
-async function apiFetch<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!csrfToken && options.method && options.method !== "GET") {
     await fetchCsrf();
   }
@@ -25,7 +30,7 @@ async function apiFetch<T>(
     (headers as Record<string, string>)["x-csrf-token"] = csrfToken;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
     headers,

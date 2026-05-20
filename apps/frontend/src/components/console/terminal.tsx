@@ -46,10 +46,10 @@ export function ServerTerminal({ serverId }: { serverId: string }) {
       term.open(termRef.current);
       fit.fit();
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
       const tokenMatch = document.cookie.match(/craftdock_token=([^;]+)/);
 
-      socket = io(apiUrl, {
+      // Same origin — Next rewrites /socket.io → backend
+      socket = io({
         path: "/socket.io",
         withCredentials: true,
         auth: { token: tokenMatch?.[1] },

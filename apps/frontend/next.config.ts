@@ -2,10 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  // xterm/socket.io are browser-only
   serverExternalPackages: ["xterm", "@xterm/addon-fit", "@xterm/addon-web-links"],
   async rewrites() {
-    const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+    // Server-side proxy target (Docker: backend:4000, local dev: localhost:4000)
+    const api = process.env.API_PROXY_URL ?? "http://127.0.0.1:4000";
     return [
       { source: "/api/:path*", destination: `${api}/api/:path*` },
       { source: "/socket.io/:path*", destination: `${api}/socket.io/:path*` },

@@ -11,19 +11,24 @@ RUN pnpm install --frozen-lockfile 2>/dev/null || pnpm install
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-# Next.js expects public/ for static assets; ensure it exists in monorepo builds
+# Proxy /api from Next → backend container (baked into standalone rewrites at build time)
+ARG API_PROXY_URL=http://backend:4000
+ENV API_PROXY_URL=$API_PROXY_URL
 RUN mkdir -p apps/frontend/public
 RUN pnpm --filter @craftdock/shared build
 RUN pnpm --filter @craftdock/frontend build
 
 FROM base AS runner
+RUN apk add --no-cache wget
 ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 WORKDIR /app
+
 COPY --from=builder /app/apps/frontend/.next/standalone ./
 COPY --from=builder /app/apps/frontend/.next/static ./apps/frontend/.next/static
 COPY --from=builder /app/apps/frontend/public ./apps/frontend/public
+
+WORKDIR /app/apps/frontend
 EXPOSE 3000
-ENV HOSTNAME=0.0.0.0
-CMD ["node", "apps/frontend/server.js"]
+CMD ["node", "server.js"]
