@@ -7,14 +7,23 @@ import {
   USER_ROLES,
 } from "./constants";
 
+/** Self-hosted friendly — accepts admin@localhost, *.local, etc. (Zod .email() rejects those) */
+export const emailSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(254)
+  .regex(/^[^\s@]+@[^\s@]+$/, "Invalid email format");
+
 export const registerSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_-]+$/),
   password: z.string().min(8).max(128),
 });
 
+/** `email` field accepts email address or username */
 export const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().min(1).max(254),
   password: z.string().min(1),
 });
 

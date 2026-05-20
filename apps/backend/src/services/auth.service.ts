@@ -60,7 +60,12 @@ export async function register(input: RegisterInput) {
 }
 
 export async function login(input: LoginInput, meta?: { ip?: string; ua?: string }) {
-  const user = await prisma.user.findUnique({ where: { email: input.email } });
+  const identifier = input.email.trim();
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [{ email: identifier }, { username: identifier }],
+    },
+  });
   if (!user || !(await verifyPassword(user.passwordHash, input.password))) {
     throw new AppError(401, "Invalid credentials", "INVALID_CREDENTIALS");
   }
@@ -117,15 +122,39 @@ export async function logout(token: string): Promise<void> {
 
 export async function seedAdminIfNeeded(): Promise<void> {
   const count = await prisma.user.count();
-  if (count > 0) return;
+  if (count === 0) {
+    await prisma.user.create({
+      data: {
+        email: env.adminEmail,
+        username: env.adminUsername,
+        passwordHash: await hashPassword(env.adminPassword),
+        role: "ADMIN",
+      },
+    });
+    console.log(`[CraftDock] Seeded admin user: ${env.adminUsername} <${env.adminEmail}>`);
+    return;
+  }
 
-  await prisma.user.create({
-    data: {
-      email: env.adminEmail,
-      username: env.adminUsername,
-      passwordHash: await hashPassword(env.adminPassword),
-      role: "ADMIN",
-    },
+  // Keep admin in sync when .env email/password changes
+  const admin = await prisma.user.findFirst({
+    where: { OR: [{ username: env.adminUsername }, { role: "ADMIN" }] },
+    orderBy: { createdAt: "asc" },
   });
-  console.log(`[CraftDock] Seeded admin user: ${env.adminUsername}`);
+  if (!admin) return;
+
+  const emailChanged = admin.email !== env.adminEmail;
+  const passwordValid = await verifyPassword(admin.passwordHash, env.adminPassword).catch(
+    () => false
+  );
+
+  if (emailChanged || !passwordValid) {
+    await prisma.user.update({
+      where: { id: admin.id },
+      data: {
+        email: env.adminEmail,
+        ...(passwordValid ? {} : { passwordHash: await hashPassword(env.adminPassword) }),
+      },
+    });
+    console.log(`[CraftDock] Updated admin account to ${env.adminUsername} <${env.adminEmail}>`);
+  }
 }

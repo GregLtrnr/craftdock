@@ -37,8 +37,9 @@ export default function LoginPage() {
         <p className="mt-1 text-sm text-muted">Self-hosted Minecraft hosting panel</p>
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <Input
-            type="email"
-            placeholder="Email"
+            type="text"
+            placeholder="Email or username"
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
