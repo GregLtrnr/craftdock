@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getApiBase } from "@/lib/api-base";
+import { getApiBase } from "@/lib/api";
 
 /**
  * Live Minecraft console via xterm + Socket.IO.

@@ -1,4 +1,14 @@
-import { getApiBase } from "./api-base";
+/**
+ * Public API URL — frontend :3000, API :4000 on the same host.
+ */
+export function getApiBase(): string {
+  if (typeof window === "undefined") {
+    return process.env.API_PROXY_URL ?? "http://127.0.0.1:4000";
+  }
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  return `${window.location.protocol}//${window.location.hostname}:4000`;
+}
 
 let csrfToken: string | null = null;
 
