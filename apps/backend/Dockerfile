@@ -24,7 +24,7 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm --filter @craftdock/shared build
-RUN cd apps/backend && npx prisma generate && pnpm build
+RUN cd apps/backend && pnpm exec prisma generate && pnpm build
 
 FROM base AS runner
 RUN apt-get update \
@@ -38,5 +38,7 @@ COPY --from=builder /app/apps/backend/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 RUN mkdir -p /var/lib/craftdock/servers /var/lib/craftdock/backups
+# Pin Prisma 6 — `npx prisma` would pull Prisma 7 and break schema.prisma
+RUN npm install -g prisma@6.19.3
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy || npx prisma db push; exec node dist/index.js"]
+CMD ["sh", "-c", "prisma migrate deploy || prisma db push; exec node dist/index.js"]
