@@ -6,6 +6,7 @@ import { getAdapter } from "../adapters";
 import { logger } from "../lib/logger";
 import { appendInstallLog } from "../lib/install-log";
 import { getFabricServerJarUrl } from "../lib/fabric-meta";
+import { syncServerRuntimeConfig } from "../lib/server-config";
 
 const USER_AGENT = "CraftDock/1.0 (https://github.com/craftdock)";
 
@@ -125,23 +126,7 @@ async function writeServerBootstrap(
     path.join(dataPath, "eula.txt"),
     "eula=false\n# Accept EULA from CraftDock panel\n"
   );
-  const props = [
-    `server-port=${opts.port}`,
-    "gamemode=survival",
-    "difficulty=normal",
-    "max-players=20",
-    "online-mode=true",
-    "motd=A CraftDock Server",
-  ].join("\n");
-  await fs.writeFile(path.join(dataPath, "server.properties"), props + "\n");
-  const script = `#!/bin/bash
-set -e
-cd "$(dirname "$0")"
-JAVA="\${JAVA_HOME:-/opt/java-home}/bin/java"
-MEM="${opts.ramMb}"
-exec stdbuf -oL -eL "$JAVA" -Xms\${MEM}M -Xmx\${MEM}M -jar server.jar nogui
-`;
-  await fs.writeFile(path.join(dataPath, "start.sh"), script, { mode: 0o755 });
+  await syncServerRuntimeConfig(dataPath, opts);
 }
 
 async function installFabricJar(
@@ -238,6 +223,14 @@ export async function installMrpackFromIndex(
 
   await log(`Applying overrides…`);
   await applyOverrideDirs(dataPath);
+
+  const { fixedPort, fixedServerIp } = await syncServerRuntimeConfig(dataPath, opts);
+  if (fixedPort) {
+    await log(`Fixed server-port in server.properties (modpack override) → ${opts.port}`);
+  }
+  if (fixedServerIp) {
+    await log("Removed server-ip=127.0.0.1 so LAN clients can connect");
+  }
 
   const modsDir = path.join(dataPath, "mods");
   let modCount = 0;

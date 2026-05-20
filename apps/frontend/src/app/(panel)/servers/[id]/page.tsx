@@ -47,6 +47,12 @@ export default function ServerDetailPage({
     { level: string; message: string; createdAt: string }[]
   >([]);
   const [connectHost, setConnectHost] = useState("");
+  const [network, setNetwork] = useState<{
+    listening: boolean;
+    propertiesPort: number | null;
+    propertiesServerIp: string | null;
+    issues: string[];
+  } | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -77,6 +83,21 @@ export default function ServerDetailPage({
       ...prev.slice(-19),
       { time: new Date().toLocaleTimeString(), value: st.memoryUsedMb },
     ]);
+    if (s.status === "RUNNING" || s.status === "STOPPED") {
+      try {
+        const { network: nw } = await api.get<{
+          network: {
+            listening: boolean;
+            propertiesPort: number | null;
+            propertiesServerIp: string | null;
+            issues: string[];
+          };
+        }>(`/api/servers/${id}/network`);
+        setNetwork(nw);
+      } catch {
+        setNetwork(null);
+      }
+    }
   };
 
   useEffect(() => {
@@ -160,12 +181,42 @@ export default function ServerDetailPage({
         </div>
       </div>
 
-      {server.status === "RUNNING" && connectHost && (
+      {connectHost && (
         <Card className="mt-6 border-primary/40 bg-primary/5">
           <h3 className="font-semibold">Connect from Minecraft</h3>
           <p className="mt-2 font-mono text-lg">
             {connectHost}:{server.port}
           </p>
+          <p className="mt-2 text-sm text-muted">
+            Use this exact port in Multiplayer (not ping). Minecraft does not respond to ICMP.
+          </p>
+          {network && (
+            <div className="mt-3 space-y-1 text-sm">
+              <p>
+                Port listening:{" "}
+                <span className={network.listening ? "text-primary" : "text-danger"}>
+                  {network.listening ? "yes" : "no"}
+                </span>
+              </p>
+              {network.propertiesPort != null && network.propertiesPort !== server.port && (
+                <p className="text-danger">
+                  server.properties has port {network.propertiesPort} — Stop then Start to fix.
+                </p>
+              )}
+              {network.propertiesServerIp &&
+                network.propertiesServerIp !== "" &&
+                network.propertiesServerIp !== "0.0.0.0" && (
+                  <p className="text-danger">
+                    server-ip={network.propertiesServerIp} blocks LAN — Stop then Start to fix.
+                  </p>
+                )}
+              {network.issues.map((issue) => (
+                <p key={issue} className="text-danger">
+                  {issue}
+                </p>
+              ))}
+            </div>
+          )}
         </Card>
       )}
 

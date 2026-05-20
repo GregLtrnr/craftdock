@@ -120,6 +120,16 @@ router.get("/:id/logs", async (req: AuthRequest, res, next) => {
   }
 });
 
+router.get("/:id/network", async (req: AuthRequest, res, next) => {
+  try {
+    await requireServerAccess(req.user!.userId, param(req.params.id), req.user!.role);
+    const network = await serverService.getServerNetworkStatus(param(req.params.id));
+    res.json({ network });
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get("/:id/stats", async (req: AuthRequest, res, next) => {
   try {
     await requireServerAccess(req.user!.userId, param(req.params.id), req.user!.role);

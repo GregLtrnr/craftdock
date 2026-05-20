@@ -11,6 +11,7 @@ import Docker from "dockerode";
 import { installModpackToServer } from "./modpack.service";
 import type { ModpackSource } from "@craftdock/shared";
 import { logger } from "../lib/logger";
+import { syncServerRuntimeConfig, readServerProperties, isTcpPortOpen } from "../lib/server-config";
 export async function listServers(userId: string, role: string) {
   const where =
     role === "ADMIN"
@@ -170,6 +171,14 @@ export async function startServer(serverId: string): Promise<void> {
     data: { status: "STARTING" },
   });
 
+  const sync = await syncServerRuntimeConfig(server.dataPath, {
+    port: server.port,
+    ramMb: server.ramMb,
+  });
+  if (sync.fixedPort || sync.fixedServerIp) {
+    logger.info("Fixed server network config before start", { serverId, ...sync });
+  }
+
   const runtime = await createRuntime(
     serverId,
     server.runtimeMode,
@@ -250,7 +259,52 @@ export async function deleteServer(serverId: string): Promise<void> {
 }
 
 export async function updateServer(serverId: string, input: UpdateServerInput) {
-  return prisma.server.update({ where: { id: serverId }, data: input });
+  const server = await prisma.server.update({ where: { id: serverId }, data: input });
+  if (input.ramMb != null) {
+    await syncServerRuntimeConfig(server.dataPath, {
+      port: server.port,
+      ramMb: input.ramMb,
+    });
+  }
+  return server;
+}
+
+export async function getServerNetworkStatus(serverId: string) {
+  const server = await getServer(serverId);
+  const props = await readServerProperties(server.dataPath);
+  const runtime = getRuntime(serverId);
+  const listening = runtime?.isRunning()
+    ? await isTcpPortOpen(server.port)
+    : false;
+
+  const issues: string[] = [];
+  if (props.serverPort != null && props.serverPort !== server.port) {
+    issues.push(
+      `server.properties had port ${props.serverPort}, expected ${server.port} — restart server to apply fix`
+    );
+  }
+  if (props.serverIp && props.serverIp !== "" && props.serverIp !== "0.0.0.0") {
+    issues.push(`server-ip=${props.serverIp} blocks LAN access — use empty or 0.0.0.0`);
+  }
+  if (server.status === "RUNNING" && !listening) {
+    issues.push("Process is running but port is not accepting connections yet");
+  }
+  if (server.port < 25565 || server.port > 25665) {
+    issues.push(
+      `Port ${server.port} is outside docker-compose range 25565-25665 — extend MINECRAFT_PORT_MAX and recreate backend`
+    );
+  }
+
+  return {
+    assignedPort: server.port,
+    propertiesPort: props.serverPort ?? null,
+    propertiesServerIp: props.serverIp ?? null,
+    status: server.status,
+    processRunning: runtime?.isRunning() ?? false,
+    listening,
+    connectAddress: `192.168.x.x:${server.port}`,
+    issues,
+  };
 }
 
 export async function getServerStats(serverId: string) {
