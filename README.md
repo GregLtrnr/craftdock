@@ -105,6 +105,27 @@ pnpm db:push
 
 Nginx terminates HTTP and proxies `/api` and `/socket.io` to the backend.
 
+### Connecting from another PC on your LAN
+
+Modpack servers run in **Native** mode inside the `backend` container. Their port is **not** 25565 by default (modpack install picks a random port in 25566–25665). Use the port shown on the server page.
+
+1. Open the panel at `http://<ubuntu-lan-ip>:3000` (e.g. `http://192.168.1.170:3000`).
+2. On the server page, use **Multiplayer → Add server** with address `<ubuntu-lan-ip>:<port>` (same port as in the panel).
+3. **Ping (ICMP) does not work** for Minecraft — use the game port, not ping.
+4. After changing `docker-compose.yml` port ranges, recreate the backend:
+
+   ```bash
+   docker compose up -d backend
+   ```
+
+5. Open the port on Ubuntu if UFW is enabled:
+
+   ```bash
+   sudo ufw allow 25565:25665/tcp
+   ```
+
+6. Test from your laptop: `nc -zv 192.168.1.170 25566` (replace IP and port).
+
 ### Environment variables
 
 See `apps/backend/.env.example` for full list. Key variables:

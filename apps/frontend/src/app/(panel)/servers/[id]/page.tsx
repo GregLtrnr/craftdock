@@ -37,6 +37,13 @@ export default function ServerDetailPage({
   const [installLogs, setInstallLogs] = useState<
     { level: string; message: string; createdAt: string }[]
   >([]);
+  const [connectHost, setConnectHost] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setConnectHost(window.location.hostname);
+    }
+  }, []);
 
   const load = async () => {
     const { server: s } = await api.get<{ server: Server }>(`/api/servers/${id}`);
@@ -132,6 +139,19 @@ export default function ServerDetailPage({
           )}
         </div>
       </div>
+
+      {server.status === "RUNNING" && connectHost && (
+        <Card className="mt-6 border-primary/40 bg-primary/5">
+          <h3 className="font-semibold">Connect from Minecraft</h3>
+          <p className="mt-2 font-mono text-lg">
+            {connectHost}:{server.port}
+          </p>
+          <p className="mt-2 text-sm text-muted">
+            Use this address in Multiplayer (not ping — Minecraft does not respond to ICMP).
+            The port is {server.port}, not necessarily 25565.
+          </p>
+        </Card>
+      )}
 
       {(server.status === "INSTALLING" || server.status === "CRASHED") && installLogs.length > 0 && (
         <Card className="mt-6 border-danger/40">
