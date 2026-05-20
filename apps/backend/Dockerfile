@@ -27,6 +27,9 @@ RUN pnpm --filter @craftdock/shared build
 RUN cd apps/backend && npx prisma generate && pnpm build
 
 FROM base AS runner
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends wget \
+    && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=builder /app/apps/backend/dist ./dist
@@ -36,4 +39,4 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 RUN mkdir -p /var/lib/craftdock/servers /var/lib/craftdock/backups
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy || npx prisma db push; exec node dist/index.js"]

@@ -23,6 +23,8 @@ services:
       context: .
       dockerfile: apps/backend/Dockerfile
     restart: unless-stopped
+    env_file:
+      - .env
     networks:
       - craftdock-net
     depends_on:
@@ -47,6 +49,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "4000:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/system/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   frontend:
     build:
