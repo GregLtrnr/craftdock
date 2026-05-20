@@ -110,6 +110,16 @@ router.post("/:id/eula", async (req: AuthRequest, res, next) => {
   }
 });
 
+router.get("/:id/logs", async (req: AuthRequest, res, next) => {
+  try {
+    await requireServerAccess(req.user!.userId, param(req.params.id), req.user!.role);
+    const logs = await serverService.getServerLogs(param(req.params.id));
+    res.json({ logs });
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get("/:id/stats", async (req: AuthRequest, res, next) => {
   try {
     await requireServerAccess(req.user!.userId, param(req.params.id), req.user!.role);

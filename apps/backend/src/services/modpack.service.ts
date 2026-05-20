@@ -55,11 +55,17 @@ export async function installModpackToServer(
   projectId: string,
   versionId: string,
   dataPath: string,
-  opts?: { port: number; ramMb: number; javaVersion: string }
+  opts?: { serverId: string; port: number; ramMb: number; javaVersion: string }
 ): Promise<ModpackInstallMeta> {
   if (source === "modrinth") {
-    if (!opts) throw new AppError(400, "Server options required for Modrinth install");
-    const result = await modrinthService.installVersionToServer(versionId, dataPath, opts);
+    if (!opts?.serverId) throw new AppError(400, "Server options required for Modrinth install");
+    const { serverId, ...installOpts } = opts;
+    const result = await modrinthService.installVersionToServer(
+      versionId,
+      dataPath,
+      serverId,
+      installOpts
+    );
     if (result) {
       return { minecraftVersion: result.minecraftVersion, serverType: result.serverType };
     }

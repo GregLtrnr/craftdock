@@ -4,6 +4,7 @@ import { AppError } from "../lib/errors";
 import type { ModpackSearchResult, ModpackVersion } from "@craftdock/shared";
 import { logger } from "../lib/logger";
 import { extractArchive, removeFileIfExists } from "../lib/extract-archive";
+import { appendInstallLog } from "../lib/install-log";
 import { installMrpackFromIndex, type MrpackInstallResult } from "./modrinth-mrpack";
 
 const BASE_URL = "https://api.modrinth.com/v2";
@@ -125,17 +126,14 @@ export class ModrinthService {
   async installVersionToServer(
     versionId: string,
     dataPath: string,
+    serverId: string,
     opts: ModrinthInstallOptions
   ): Promise<MrpackInstallResult | null> {
     const version = await this.request<MrVersion>(`/version/${encodeURIComponent(versionId)}`);
     const file = pickInstallFile(version.files);
     if (!file) throw new AppError(404, "No downloadable file for this version", "MODRINTH_NO_FILE");
 
-    logger.info("Downloading Modrinth modpack archive", {
-      versionId,
-      file: file.filename,
-      dataPath,
-    });
+    await appendInstallLog(serverId, "info", `Downloading ${file.filename}…`);
 
     const res = await fetch(file.url, { headers: { "User-Agent": USER_AGENT } });
     if (!res.ok) {
@@ -144,12 +142,13 @@ export class ModrinthService {
 
     const archivePath = path.join(dataPath, file.filename);
     await fs.writeFile(archivePath, Buffer.from(await res.arrayBuffer()));
+    await appendInstallLog(serverId, "info", "Extracting archive…");
     await extractArchive(archivePath, dataPath);
     await removeFileIfExists(archivePath);
 
     const indexPath = path.join(dataPath, "modrinth.index.json");
     if (await fileExists(indexPath)) {
-      return installMrpackFromIndex(dataPath, opts);
+      return installMrpackFromIndex(dataPath, serverId, opts);
     }
 
     logger.info("Modrinth zip extracted (no index — assuming pre-built server pack)", {

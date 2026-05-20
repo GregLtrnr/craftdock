@@ -35,6 +35,14 @@ export async function getServer(serverId: string) {
   );
 }
 
+export async function getServerLogs(serverId: string, limit = 80) {
+  return prisma.serverLog.findMany({
+    where: { serverId },
+    orderBy: { createdAt: "asc" },
+    take: limit,
+  });
+}
+
 export async function createServer(ownerId: string, input: CreateServerInput) {
   const portTaken = await prisma.server.findUnique({ where: { port: input.port } });
   if (portTaken) throw new AppError(409, "Port already in use", "PORT_TAKEN");
@@ -69,16 +77,14 @@ export async function createServer(ownerId: string, input: CreateServerInput) {
 
   // Install asynchronously
   installServer(server.id).catch(async (err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    const { appendInstallLog } = await import("../lib/install-log");
+    const { logger } = await import("../lib/logger");
+    logger.error("Server install failed", { serverId: server.id, err: message, stack: (err as Error).stack });
+    await appendInstallLog(server.id, "error", `Install failed: ${message}`);
     await prisma.server.update({
       where: { id: server.id },
       data: { status: "CRASHED" },
-    });
-    await prisma.serverLog.create({
-      data: {
-        serverId: server.id,
-        level: "error",
-        message: `Install failed: ${(err as Error).message}`,
-      },
     });
   });
 
@@ -123,7 +129,11 @@ async function installModpackServer(server: Awaited<ReturnType<typeof getServer>
     throw new Error("Modpack project and version id required");
   }
 
+  const { appendInstallLog } = await import("../lib/install-log");
+  await appendInstallLog(server.id, "info", "Modpack install started");
+
   const meta = await installModpackToServer(source, projectId, versionId, server.dataPath, {
+    serverId: server.id,
     port: server.port,
     ramMb: server.ramMb,
     javaVersion: server.javaVersion,

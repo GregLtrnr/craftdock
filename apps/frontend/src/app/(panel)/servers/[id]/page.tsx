@@ -34,10 +34,23 @@ export default function ServerDetailPage({
   const [tab, setTab] = useState<Tab>("console");
   const [chartData, setChartData] = useState<{ time: string; value: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [installLogs, setInstallLogs] = useState<
+    { level: string; message: string; createdAt: string }[]
+  >([]);
 
   const load = async () => {
     const { server: s } = await api.get<{ server: Server }>(`/api/servers/${id}`);
     setServer(s);
+    if (s.status === "INSTALLING" || s.status === "CRASHED") {
+      try {
+        const { logs } = await api.get<{
+          logs: { level: string; message: string; createdAt: string }[];
+        }>(`/api/servers/${id}/logs`);
+        setInstallLogs(logs);
+      } catch {
+        setInstallLogs([]);
+      }
+    }
     const { stats: st } = await api.get<{ stats: ServerStats }>(`/api/servers/${id}/stats`);
     setStats(st);
     setChartData((prev) => [
@@ -119,6 +132,24 @@ export default function ServerDetailPage({
           )}
         </div>
       </div>
+
+      {(server.status === "INSTALLING" || server.status === "CRASHED") && installLogs.length > 0 && (
+        <Card className="mt-6 border-danger/40">
+          <h3 className="font-semibold">
+            {server.status === "CRASHED" ? "Install failed" : "Installing…"}
+          </h3>
+          <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto font-mono text-xs">
+            {installLogs.map((line, i) => (
+              <li
+                key={`${line.createdAt}-${i}`}
+                className={line.level === "error" ? "text-danger" : "text-muted"}
+              >
+                {line.message}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <Card>
