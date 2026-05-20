@@ -1,12 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { use, useEffect, useState } from "react";
 import { api, type Server, type ServerStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ServerTerminal } from "@/components/console/terminal";
-import { ResourceChart } from "@/components/charts/resource-chart";
 import { cn } from "@/lib/utils";
+
+// xterm.js uses `self` — must not load during SSR
+const ServerTerminal = dynamic(
+  () => import("@/components/console/terminal").then((m) => m.ServerTerminal),
+  { ssr: false, loading: () => <p className="text-sm text-muted">Loading console…</p> }
+);
+
+const ResourceChart = dynamic(
+  () => import("@/components/charts/resource-chart").then((m) => m.ResourceChart),
+  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-lg bg-card" /> }
+);
 
 type Tab = "console" | "files" | "players" | "settings";
 

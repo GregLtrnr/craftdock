@@ -1,9 +1,14 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/card";
-import { ResourceChart } from "@/components/charts/resource-chart";
+
+const ResourceChart = dynamic(
+  () => import("@/components/charts/resource-chart").then((m) => m.ResourceChart),
+  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-lg bg-card" /> }
+);
 
 export default function AdminPage() {
   const [metrics, setMetrics] = useState<{
