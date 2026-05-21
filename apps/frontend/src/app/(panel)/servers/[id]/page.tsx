@@ -9,6 +9,7 @@ import { api, type Server, type ServerStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ServerDetailHeader } from "@/components/servers/server-detail-header";
+import { FileManager } from "@/components/servers/file-manager";
 import { cn } from "@/lib/utils";
 
 const ServerTerminal = dynamic(
@@ -260,47 +261,6 @@ export default function ServerDetailPage({
         </div>
       )}
     </div>
-  );
-}
-
-function FileManager({ serverId }: { serverId: string }) {
-  const [files, setFiles] = useState<
-    { name: string; path: string; isDirectory: boolean }[]
-  >([]);
-  const [path, setPath] = useState(".");
-
-  useEffect(() => {
-    api
-      .get<{ files: { name: string; path: string; isDirectory: boolean }[] }>(
-        `/api/${serverId}/files?path=${encodeURIComponent(path)}`,
-      )
-      .then((d) => setFiles(d.files))
-      .catch(() => setFiles([]));
-  }, [serverId, path]);
-
-  return (
-    <Card>
-      <p className="mb-2 font-mono text-sm text-muted">/{path}</p>
-      <ul className="space-y-1 font-mono text-sm">
-        {path !== "." && (
-          <li>
-            <button className="text-primary hover:underline" onClick={() => setPath(".")}>
-              ..
-            </button>
-          </li>
-        )}
-        {files.map((f) => (
-          <li key={f.path}>
-            <button
-              className="hover:text-primary"
-              onClick={() => f.isDirectory && setPath(f.path)}
-            >
-              {f.isDirectory ? "📁" : "📄"} {f.name}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </Card>
   );
 }
 
