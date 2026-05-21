@@ -8,6 +8,17 @@ export const SERVER_TYPES = [
   "MODPACK",
 ] as const;
 
+/** Loader choices for uploaded modpack import (auto = read manifest / instance json). */
+export const MODPACK_IMPORT_LOADERS = [
+  "auto",
+  "FABRIC",
+  "NEOFORGE",
+  "FORGE",
+  "VANILLA",
+  "PAPER",
+  "PURPUR",
+] as const;
+
 export const RUNTIME_MODES = ["NATIVE", "DOCKER"] as const;
 
 export const USER_ROLES = ["USER", "ADMIN"] as const;

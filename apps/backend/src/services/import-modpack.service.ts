@@ -14,6 +14,60 @@ import type { ModpackInstallMeta } from "./modpack.service";
 import { MAX_MODPACK_UPLOAD_BYTES } from "@craftdock/shared";
 
 const UPLOAD_ARCHIVE = "_upload.pack.zip";
+const IMPORT_OPTIONS_FILE = "_import-options.json";
+
+export interface ModpackLoaderOverrides {
+  serverType: ServerType;
+  loaderVersion?: string;
+  minecraftVersion?: string;
+}
+
+/** Persist manual loader choice before async install (written at upload time). */
+export async function saveModpackImportOptions(
+  dataPath: string,
+  options: {
+    loader?: string;
+    loaderVersion?: string;
+    minecraftVersion?: string;
+  }
+): Promise<void> {
+  const loader = options.loader?.trim();
+  if (!loader || loader === "auto") return;
+
+  const serverType = loader as ServerType;
+  if (!["FABRIC", "FORGE", "NEOFORGE", "VANILLA", "PAPER", "PURPUR"].includes(serverType)) {
+    throw new AppError(400, `Invalid loader: ${loader}`, "INVALID_LOADER");
+  }
+
+  await fs.mkdir(dataPath, { recursive: true });
+  const payload: ModpackLoaderOverrides = {
+    serverType,
+    loaderVersion: options.loaderVersion?.trim() || undefined,
+    minecraftVersion: options.minecraftVersion?.trim() || undefined,
+  };
+  await fs.writeFile(
+    path.join(dataPath, IMPORT_OPTIONS_FILE),
+    JSON.stringify(payload),
+    "utf8"
+  );
+}
+
+export async function readModpackImportOptions(
+  dataPath: string
+): Promise<ModpackLoaderOverrides | null> {
+  const p = path.join(dataPath, IMPORT_OPTIONS_FILE);
+  if (!(await fileExists(p))) return null;
+  try {
+    const raw = await fs.readFile(p, "utf8");
+    const data = JSON.parse(raw) as ModpackLoaderOverrides;
+    if (!data.serverType) return null;
+    return data;
+  } catch {
+    return null;
+  } finally {
+    await fs.unlink(p).catch(() => undefined);
+  }
+}
 
 async function fileExists(p: string): Promise<boolean> {
   try {
@@ -138,10 +192,34 @@ async function detectFromInstanceJson(dataPath: string): Promise<DetectedPack | 
   }
 }
 
-async function detectPackMeta(
+async function detectMinecraftVersionOnly(
   dataPath: string,
   hintVersion?: string
+): Promise<string> {
+  const fromManifest = await detectFromManifest(dataPath);
+  if (fromManifest) return fromManifest.minecraftVersion;
+  const fromInstance = await detectFromInstanceJson(dataPath);
+  if (fromInstance) return fromInstance.minecraftVersion;
+  return hintVersion ?? "1.20.1";
+}
+
+async function detectPackMeta(
+  dataPath: string,
+  hintVersion?: string,
+  overrides?: ModpackLoaderOverrides | null
 ): Promise<DetectedPack> {
+  if (overrides?.serverType) {
+    const minecraftVersion =
+      overrides.minecraftVersion ??
+      hintVersion ??
+      (await detectMinecraftVersionOnly(dataPath, hintVersion));
+    return {
+      minecraftVersion,
+      serverType: overrides.serverType,
+      loaderVersion: overrides.loaderVersion,
+    };
+  }
+
   const fromManifest = await detectFromManifest(dataPath);
   if (fromManifest) return fromManifest;
 
@@ -270,20 +348,25 @@ export async function installUploadedModpackZip(
   await removeFileIfExists(archivePath);
   await normalizeExtractedRoot(dataPath);
 
+  const importOverrides = await readModpackImportOptions(dataPath);
+
   const indexPath = path.join(dataPath, "modrinth.index.json");
   if (await fileExists(indexPath)) {
     await log("Detected Modrinth .mrpack index — installing mods and loader…");
-    const result = await installMrpackFromIndex(dataPath, serverId, opts);
+    const result = await installMrpackFromIndex(dataPath, serverId, opts, importOverrides);
     return { minecraftVersion: result.minecraftVersion, serverType: result.serverType };
   }
 
   await log("Applying overrides…");
   await applyOverrideDirs(dataPath);
 
-  const detected = await detectPackMeta(dataPath, opts.minecraftVersion);
+  const detected = await detectPackMeta(dataPath, opts.minecraftVersion, importOverrides);
   await log(
-    `Detected Minecraft ${detected.minecraftVersion}, loader ${detected.serverType}` +
-      (detected.loaderVersion ? ` ${detected.loaderVersion}` : "")
+    (importOverrides
+      ? `Using configured loader ${detected.serverType}`
+      : `Detected Minecraft ${detected.minecraftVersion}, loader ${detected.serverType}`) +
+      (detected.loaderVersion ? ` ${detected.loaderVersion}` : "") +
+      (importOverrides ? ` (Minecraft ${detected.minecraftVersion})` : "")
   );
 
   const result = await installServerJar(dataPath, detected, opts, log);

@@ -6,7 +6,10 @@ import { MAX_MODPACK_UPLOAD_BYTES } from "@craftdock/shared";
 import { param } from "../lib/params";
 import { authenticate, type AuthRequest } from "../middleware/auth";
 import { modpackSearchSchema, installModpackSchema, importModpackSchema } from "@craftdock/shared";
-import { saveUploadedModpackArchive } from "../services/import-modpack.service";
+import {
+  saveUploadedModpackArchive,
+  saveModpackImportOptions,
+} from "../services/import-modpack.service";
 import {
   searchModpacks,
   getModpackVersions,
@@ -85,7 +88,7 @@ router.post("/import", upload.single("file"), async (req: AuthRequest, res, next
       {
         name: input.name,
         serverType: "MODPACK",
-        minecraftVersion: input.minecraftVersion ?? "1.20.1",
+        minecraftVersion: input.minecraftVersion?.trim() || "1.20.1",
         ramMb: input.ramMb,
         port: input.port,
         javaVersion: "21",
@@ -104,6 +107,11 @@ router.post("/import", upload.single("file"), async (req: AuthRequest, res, next
       { tempPath: path.resolve(req.file.path) },
       req.file.originalname
     );
+    await saveModpackImportOptions(server.dataPath, {
+      loader: input.loader,
+      loaderVersion: input.loaderVersion,
+      minecraftVersion: input.minecraftVersion,
+    });
     scheduleServerInstall(server.id);
 
     res.status(201).json({ server });

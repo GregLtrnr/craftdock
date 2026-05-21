@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   MAX_RAM_MB,
   MIN_RAM_MB,
+  MODPACK_IMPORT_LOADERS,
   RUNTIME_MODES,
   SERVER_TYPES,
   USER_ROLES,
@@ -100,6 +101,9 @@ export const importModpackSchema = z.object({
   port: z.coerce.number().int().min(1024).max(65535),
   runtimeMode: z.enum(RUNTIME_MODES).default("NATIVE"),
   minecraftVersion: z.string().max(32).optional(),
+  /** auto = detect from pack; otherwise force this loader (+ optional loaderVersion). */
+  loader: z.enum(MODPACK_IMPORT_LOADERS).optional().default("auto"),
+  loaderVersion: z.string().max(64).optional(),
 });
 
 export const backupCreateSchema = z.object({

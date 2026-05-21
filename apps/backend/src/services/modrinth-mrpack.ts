@@ -8,6 +8,7 @@ import { appendInstallLog } from "../lib/install-log";
 import { getFabricServerJarUrl } from "../lib/fabric-meta";
 import { hasPlayableServerLauncher, syncServerRuntimeConfig } from "../lib/server-config";
 import { installNeoForgeServer } from "../lib/neoforge-install";
+import type { ModpackLoaderOverrides } from "./import-modpack.service";
 
 const USER_AGENT = "CraftDock/1.0 (https://github.com/craftdock)";
 
@@ -147,7 +148,8 @@ async function installFabricJar(
 export async function installMrpackFromIndex(
   dataPath: string,
   serverId: string,
-  opts: { port: number; ramMb: number; javaVersion: string }
+  opts: { port: number; ramMb: number; javaVersion: string; minecraftVersion?: string },
+  importOverrides?: ModpackLoaderOverrides | null
 ): Promise<MrpackInstallResult> {
   const log = (msg: string) => appendInstallLog(serverId, "info", msg);
 
@@ -165,14 +167,33 @@ export async function installMrpackFromIndex(
   }
 
   const deps = index.dependencies ?? {};
-  const { serverType, minecraftVersion, loaderVersion } = detectLoader(deps);
-  const toFetch = index.files.filter(shouldInstallOnServer);
+  let serverType: ServerType;
+  let minecraftVersion: string;
+  let loaderVersion: string | undefined;
 
-  await log(
-    `Pack: Minecraft ${minecraftVersion}, loader ${serverType}` +
-      (loaderVersion ? ` ${loaderVersion}` : "") +
-      ` — ${toFetch.length} files to download`
-  );
+  if (importOverrides?.serverType) {
+    serverType = importOverrides.serverType;
+    loaderVersion = importOverrides.loaderVersion;
+    minecraftVersion =
+      importOverrides.minecraftVersion ?? opts.minecraftVersion ?? deps.minecraft ?? "1.20.1";
+    await log(
+      `Using configured loader ${serverType}` +
+        (loaderVersion ? ` ${loaderVersion}` : "") +
+        ` (Minecraft ${minecraftVersion})`
+    );
+  } else {
+    ({ serverType, minecraftVersion, loaderVersion } = detectLoader(deps));
+    await log(
+      `Pack: Minecraft ${minecraftVersion}, loader ${serverType}` +
+        (loaderVersion ? ` ${loaderVersion}` : "") +
+        ` — ${index.files.filter(shouldInstallOnServer).length} files to download`
+    );
+  }
+
+  const toFetch = index.files.filter(shouldInstallOnServer);
+  if (importOverrides) {
+    await log(`${toFetch.length} mod files to download`);
+  }
 
   if (serverType === "FABRIC") {
     await log("Downloading Fabric server jar…");

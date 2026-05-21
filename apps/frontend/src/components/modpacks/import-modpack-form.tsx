@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, FileArchive, X } from "lucide-react";
 import { apiUpload } from "@/lib/api";
@@ -9,10 +9,28 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { Server } from "@/lib/api";
-import { MAX_MODPACK_UPLOAD_BYTES } from "@craftdock/shared";
+import { MAX_MODPACK_UPLOAD_BYTES, MODPACK_IMPORT_LOADERS } from "@craftdock/shared";
 
 const ACCEPT = ".zip,.mrpack";
 const MAX_GB = MAX_MODPACK_UPLOAD_BYTES / 1024 / 1024 / 1024;
+
+const LOADER_LABELS: Record<(typeof MODPACK_IMPORT_LOADERS)[number], string> = {
+  auto: "Auto-detect from pack",
+  FABRIC: "Fabric",
+  NEOFORGE: "NeoForge",
+  FORGE: "Forge",
+  VANILLA: "Vanilla",
+  PAPER: "Paper",
+  PURPUR: "Purpur",
+};
+
+const LOADER_VERSION_HINTS: Partial<
+  Record<(typeof MODPACK_IMPORT_LOADERS)[number], string>
+> = {
+  FABRIC: "e.g. 0.15.11 (optional — latest if empty)",
+  NEOFORGE: "e.g. 21.1.215 (required for NeoForge packs)",
+  FORGE: "e.g. 47.3.0 (Forge not auto-installed from zip yet)",
+};
 
 export function ImportModpackForm({ onClose }: { onClose?: () => void }) {
   const router = useRouter();
@@ -22,8 +40,19 @@ export function ImportModpackForm({ onClose }: { onClose?: () => void }) {
   const [ramMb, setRamMb] = useState(4096);
   const [port, setPort] = useState(25566 + Math.floor(Math.random() * 100));
   const [minecraftVersion, setMinecraftVersion] = useState("");
+  const [loader, setLoader] =
+    useState<(typeof MODPACK_IMPORT_LOADERS)[number]>("auto");
+  const [loaderVersion, setLoaderVersion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const manualLoader = loader !== "auto";
+  const loaderVersionHint = LOADER_VERSION_HINTS[loader] ?? "";
+
+  const mcRequired = useMemo(
+    () => manualLoader && (loader === "NEOFORGE" || loader === "FORGE" || loader === "FABRIC"),
+    [manualLoader, loader]
+  );
 
   const pickFile = (f: File | null) => {
     if (!f) return;
@@ -57,6 +86,14 @@ export function ImportModpackForm({ onClose }: { onClose?: () => void }) {
       setError("Drop or select a modpack archive.");
       return;
     }
+    if (manualLoader && loader === "NEOFORGE" && !loaderVersion.trim()) {
+      setError("NeoForge version is required (e.g. 21.1.215).");
+      return;
+    }
+    if (mcRequired && !minecraftVersion.trim()) {
+      setError("Minecraft version is required when choosing a loader manually.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -65,6 +102,10 @@ export function ImportModpackForm({ onClose }: { onClose?: () => void }) {
       fd.append("name", name.trim());
       fd.append("ramMb", String(ramMb));
       fd.append("port", String(port));
+      fd.append("loader", loader);
+      if (loaderVersion.trim()) {
+        fd.append("loaderVersion", loaderVersion.trim());
+      }
       if (minecraftVersion.trim()) {
         fd.append("minecraftVersion", minecraftVersion.trim());
       }
@@ -189,14 +230,62 @@ export function ImportModpackForm({ onClose }: { onClose?: () => void }) {
               required
             />
           </div>
+
           <div className="sm:col-span-2">
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Minecraft version (optional)
+              Mod loader
+            </label>
+            <select
+              className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm"
+              value={loader}
+              onChange={(e) => {
+                const next = e.target.value as (typeof MODPACK_IMPORT_LOADERS)[number];
+                setLoader(next);
+                if (next === "auto") setLoaderVersion("");
+              }}
+            >
+              {MODPACK_IMPORT_LOADERS.map((id) => (
+                <option key={id} value={id}>
+                  {LOADER_LABELS[id]}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-muted">
+              Use manual selection when auto-detect picks the wrong loader (e.g. NeoForge packs).
+            </p>
+          </div>
+
+          {manualLoader && (
+            <div className="sm:col-span-2">
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                Loader version
+                {loader === "NEOFORGE" && (
+                  <span className="text-danger"> *</span>
+                )}
+              </label>
+              <Input
+                placeholder={loaderVersionHint || "Optional"}
+                value={loaderVersion}
+                onChange={(e) => setLoaderVersion(e.target.value)}
+                required={loader === "NEOFORGE"}
+              />
+            </div>
+          )}
+
+          <div className="sm:col-span-2">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              Minecraft version
+              {mcRequired && <span className="text-danger"> *</span>}
             </label>
             <Input
-              placeholder="Auto-detect from manifest.json if empty (e.g. 1.20.1)"
+              placeholder={
+                manualLoader
+                  ? "e.g. 1.21.1 (required with manual loader)"
+                  : "Auto-detect from manifest.json if empty (e.g. 1.20.1)"
+              }
               value={minecraftVersion}
               onChange={(e) => setMinecraftVersion(e.target.value)}
+              required={mcRequired}
             />
           </div>
         </div>
