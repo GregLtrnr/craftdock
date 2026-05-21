@@ -1,15 +1,25 @@
-import { BaseAdapter } from "./base.adapter";
+import path from "path";
+import fs from "fs/promises";
+import { BaseAdapter, type AdapterInstallContext } from "./base.adapter";
+import { installNeoForgeServer } from "../lib/neoforge-install";
+import { neoForgeInstallerUrl, resolveNeoForgeVersion } from "../lib/neoforge-meta";
 
 export class NeoForgeAdapter extends BaseAdapter {
   readonly type = "NEOFORGE";
 
+  override async install(ctx: AdapterInstallContext) {
+    await fs.mkdir(ctx.dataPath, { recursive: true });
+    await installNeoForgeServer(ctx.dataPath, {
+      minecraftVersion: ctx.minecraftVersion,
+      port: ctx.port,
+      ramMb: ctx.ramMb,
+    });
+    const startupScript = path.join(ctx.dataPath, "start.sh");
+    return { jarFile: "run.sh", startupScript };
+  }
+
   async getDownloadUrl(version: string): Promise<string> {
-    const res = await fetch(
-      `https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge`
-    );
-    if (!res.ok) throw new Error("Failed to fetch NeoForge versions");
-    const versions = (await res.json()) as string[];
-    const match = versions.find((v) => v.startsWith(version)) ?? versions[versions.length - 1];
-    return `https://maven.neoforged.net/releases/net/neoforged/neoforge/${match}/neoforge-${match}-installer.jar`;
+    const neoForgeVersion = await resolveNeoForgeVersion(version, version);
+    return neoForgeInstallerUrl(neoForgeVersion);
   }
 }

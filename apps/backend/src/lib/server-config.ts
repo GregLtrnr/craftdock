@@ -1,6 +1,24 @@
 import path from "path";
 import fs from "fs/promises";
 import net from "net";
+import { env } from "../config/env";
+
+async function fileExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** True when the server directory has a launcher (vanilla jar or NeoForge/Forge run.sh). */
+export async function hasPlayableServerLauncher(dataPath: string): Promise<boolean> {
+  return (
+    (await fileExists(path.join(dataPath, "server.jar"))) ||
+    (await fileExists(path.join(dataPath, "run.sh")))
+  );
+}
 
 function parsePropertyLine(line: string): { key: string; value: string } | null {
   const trimmed = line.trim();
@@ -57,16 +75,45 @@ export async function syncServerRuntimeConfig(
   const body = keptLines.join("\n").replace(/\n+$/, "") + "\n";
   await fs.writeFile(propsPath, body);
 
-  const script = `#!/bin/bash
+  const javaHome = env.javaHome.replace(/"/g, '\\"');
+  const useNeoForge = await fileExists(path.join(dataPath, "run.sh"));
+  if (useNeoForge) {
+    await writeNeoForgeUserJvmArgs(dataPath, opts.ramMb);
+  }
+  const script = useNeoForge
+    ? `#!/bin/bash
 set -e
 cd "$(dirname "$0")"
-JAVA="\${JAVA_HOME:-/opt/java-home}/bin/java"
+export JAVA_HOME="\${JAVA_HOME:-${javaHome}}"
+export PATH="$JAVA_HOME/bin:$PATH"
+chmod +x ./run.sh 2>/dev/null || true
+exec stdbuf -oL -eL ./run.sh nogui
+`
+    : `#!/bin/bash
+set -e
+cd "$(dirname "$0")"
+JAVA="\${JAVA_HOME:-${javaHome}}/bin/java"
 MEM="${opts.ramMb}"
 exec stdbuf -oL -eL "$JAVA" -Djava.net.preferIPv4Stack=true -Xms\${MEM}M -Xmx\${MEM}M -jar server.jar nogui
 `;
   await fs.writeFile(path.join(dataPath, "start.sh"), script, { mode: 0o755 });
 
   return { fixedPort, fixedServerIp };
+}
+
+/** JVM heap args for NeoForge (read from user_jvm_args.txt by run.sh). */
+export async function writeNeoForgeUserJvmArgs(
+  dataPath: string,
+  ramMb: number
+): Promise<void> {
+  const lines = [
+    "# CraftDock — JVM arguments",
+    `-Xms${ramMb}M`,
+    `-Xmx${ramMb}M`,
+    "-Djava.net.preferIPv4Stack=true",
+    "",
+  ];
+  await fs.writeFile(path.join(dataPath, "user_jvm_args.txt"), lines.join("\n"));
 }
 
 export async function readServerProperties(

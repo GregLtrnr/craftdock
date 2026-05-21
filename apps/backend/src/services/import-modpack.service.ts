@@ -7,6 +7,8 @@ import { appendInstallLog } from "../lib/install-log";
 import { installMrpackFromIndex, type MrpackInstallResult } from "./modrinth-mrpack";
 import { syncServerRuntimeConfig } from "../lib/server-config";
 import { getFabricServerJarUrl } from "../lib/fabric-meta";
+import { installNeoForgeServer } from "../lib/neoforge-install";
+import { hasPlayableServerLauncher } from "../lib/server-config";
 import { getAdapter } from "../adapters";
 import type { ModpackInstallMeta } from "./modpack.service";
 import { MAX_MODPACK_UPLOAD_BYTES } from "@craftdock/shared";
@@ -176,6 +178,16 @@ async function installServerJar(
   opts: { port: number; ramMb: number; javaVersion: string },
   log: (msg: string) => Promise<void>
 ): Promise<MrpackInstallResult> {
+  if (await fileExists(path.join(dataPath, "run.sh"))) {
+    await log("Using NeoForge/Forge run.sh from the uploaded pack");
+    await syncServerRuntimeConfig(dataPath, { port: opts.port, ramMb: opts.ramMb });
+    return {
+      minecraftVersion: detected.minecraftVersion,
+      serverType: detected.serverType,
+      filesDownloaded: 0,
+    };
+  }
+
   if (await fileExists(path.join(dataPath, "server.jar"))) {
     await log("Using server.jar from the uploaded pack");
     await syncServerRuntimeConfig(dataPath, { port: opts.port, ramMb: opts.ramMb });
@@ -196,10 +208,30 @@ async function installServerJar(
     };
   }
 
-  if (detected.serverType === "FORGE" || detected.serverType === "NEOFORGE") {
+  if (detected.serverType === "NEOFORGE") {
+    const ver = detected.loaderVersion ?? detected.minecraftVersion;
+    await log(`Installing NeoForge ${ver}…`);
+    await installNeoForgeServer(
+      dataPath,
+      {
+        minecraftVersion: detected.minecraftVersion,
+        loaderVersion: detected.loaderVersion,
+        port: opts.port,
+        ramMb: opts.ramMb,
+      },
+      log
+    );
+    return {
+      minecraftVersion: detected.minecraftVersion,
+      serverType: "NEOFORGE",
+      filesDownloaded: 0,
+    };
+  }
+
+  if (detected.serverType === "FORGE") {
     throw new AppError(
       400,
-      `${detected.serverType} server packs from a zip are not auto-installed yet. Use a Fabric pack or install the Forge/NeoForge server jar manually in Files.`,
+      "Forge server packs from a zip are not auto-installed yet. Use NeoForge/Fabric or install the Forge server manually in Files.",
       "FORGE_UPLOAD_UNSUPPORTED"
     );
   }

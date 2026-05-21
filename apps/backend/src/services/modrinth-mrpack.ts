@@ -6,7 +6,8 @@ import { getAdapter } from "../adapters";
 import { logger } from "../lib/logger";
 import { appendInstallLog } from "../lib/install-log";
 import { getFabricServerJarUrl } from "../lib/fabric-meta";
-import { syncServerRuntimeConfig } from "../lib/server-config";
+import { hasPlayableServerLauncher, syncServerRuntimeConfig } from "../lib/server-config";
+import { installNeoForgeServer } from "../lib/neoforge-install";
 
 const USER_AGENT = "CraftDock/1.0 (https://github.com/craftdock)";
 
@@ -177,9 +178,15 @@ export async function installMrpackFromIndex(
     await log("Downloading Fabric server jar…");
     await installFabricJar(dataPath, minecraftVersion, loaderVersion, opts);
     await log("Fabric server jar installed");
-  } else if (serverType === "FORGE" || serverType === "NEOFORGE") {
+  } else if (serverType === "NEOFORGE") {
+    await installNeoForgeServer(
+      dataPath,
+      { minecraftVersion, loaderVersion, port: opts.port, ramMb: opts.ramMb },
+      log
+    );
+  } else if (serverType === "FORGE") {
     throw new Error(
-      `${serverType} modpack auto-install is not supported yet — use a Fabric-based pack or install Forge manually`
+      "Forge modpack auto-install is not supported yet — use NeoForge/Fabric or install Forge manually"
     );
   } else {
     await log("Installing vanilla server jar…");
@@ -240,10 +247,13 @@ export async function installMrpackFromIndex(
 
   await fs.unlink(indexPath).catch(() => undefined);
 
-  await log(`Install complete: ${done} files, ${modCount} mods in /mods, server.jar present`);
+  await log(
+    `Install complete: ${done} files, ${modCount} mods in /mods` +
+      ((await hasPlayableServerLauncher(dataPath)) ? ", launcher ready" : "")
+  );
 
-  if (!(await fileExists(path.join(dataPath, "server.jar")))) {
-    throw new Error("server.jar missing after install");
+  if (!(await hasPlayableServerLauncher(dataPath))) {
+    throw new Error("Server launcher missing after install (expected server.jar or run.sh)");
   }
 
   logger.info("Modrinth modpack install complete", {
