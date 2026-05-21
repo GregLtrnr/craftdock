@@ -38,7 +38,7 @@ export interface FileEntry {
   modifiedAt: string;
 }
 
-export type ModpackSource = "modrinth" | "curseforge";
+export type ModpackSource = "modrinth" | "curseforge" | "upload";
 
 export interface ModpackSearchResult {
   source: ModpackSource;

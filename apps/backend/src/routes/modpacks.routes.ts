@@ -1,7 +1,12 @@
 import { Router, type IRouter } from "express";
+import multer from "multer";
+import os from "os";
+import path from "path";
+import { MAX_MODPACK_UPLOAD_BYTES } from "@craftdock/shared";
 import { param } from "../lib/params";
 import { authenticate, type AuthRequest } from "../middleware/auth";
-import { modpackSearchSchema, installModpackSchema } from "@craftdock/shared";
+import { modpackSearchSchema, installModpackSchema, importModpackSchema } from "@craftdock/shared";
+import { saveUploadedModpackArchive } from "../services/import-modpack.service";
 import {
   searchModpacks,
   getModpackVersions,
@@ -9,9 +14,21 @@ import {
   parseModpackSource,
 } from "../services/modpack.service";
 import * as serverService from "../services/server.service";
+import { scheduleServerInstall } from "../services/server.service";
 
 const router: IRouter = Router();
 router.use(authenticate);
+
+const upload = multer({
+  limits: { fileSize: MAX_MODPACK_UPLOAD_BYTES },
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+    filename: (_req, file, cb) => {
+      const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+      cb(null, `craftdock-import-${Date.now()}-${safe}`);
+    },
+  }),
+});
 
 router.get("/status", async (_req, res, next) => {
   try {
@@ -51,6 +68,45 @@ router.get("/:modId/files", async (req: AuthRequest, res, next) => {
     const slug = typeof req.query.slug === "string" ? req.query.slug : undefined;
     const files = await getModpackVersions(source, modId, slug);
     res.json({ files, source });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/import", upload.single("file"), async (req: AuthRequest, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No modpack file uploaded (.zip or .mrpack)" });
+    }
+    const input = importModpackSchema.parse(req.body);
+
+    const server = await serverService.createServer(
+      req.user!.userId,
+      {
+        name: input.name,
+        serverType: "MODPACK",
+        minecraftVersion: input.minecraftVersion ?? "1.20.1",
+        ramMb: input.ramMb,
+        port: input.port,
+        javaVersion: "21",
+        runtimeMode: input.runtimeMode,
+        autoRestart: true,
+        modpackSource: "upload",
+        modpackProjectId: "upload",
+        modpackVersionId: req.file.originalname,
+        modpackName: input.name,
+      },
+      { deferInstall: true }
+    );
+
+    await saveUploadedModpackArchive(
+      server.dataPath,
+      { tempPath: path.resolve(req.file.path) },
+      req.file.originalname
+    );
+    scheduleServerInstall(server.id);
+
+    res.status(201).json({ server });
   } catch (e) {
     next(e);
   }

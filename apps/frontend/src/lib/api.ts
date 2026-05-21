@@ -64,6 +64,29 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json();
 }
 
+/** Multipart upload (e.g. modpack zip) — do not set Content-Type so the browser sets boundary. */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  if (!csrfToken) {
+    await fetchCsrf();
+  }
+  const headers: HeadersInit = {};
+  if (csrfToken) {
+    (headers as Record<string, string>)["x-csrf-token"] = csrfToken;
+  }
+  const res = await fetch(`${getApiBase()}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    const msg = err.error ?? res.statusText;
+    throw new Error(err.code ? `${msg} (${err.code})` : msg);
+  }
+  return res.json() as Promise<T>;
+}
+
 export const api = {
   get: <T>(path: string) => apiFetch<T>(path),
   post: <T>(path: string, body?: unknown) =>

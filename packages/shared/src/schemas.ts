@@ -27,7 +27,7 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-export const modpackSourceSchema = z.enum(["modrinth", "curseforge"]);
+export const modpackSourceSchema = z.enum(["modrinth", "curseforge", "upload"]);
 
 export const createServerSchema = z.object({
   name: z.string().min(1).max(64),
@@ -93,6 +93,15 @@ export const installModpackSchema = z.object({
   runtimeMode: z.enum(RUNTIME_MODES).default("NATIVE"),
 });
 
+/** Multipart form fields for POST /api/modpacks/import */
+export const importModpackSchema = z.object({
+  name: z.string().min(1).max(64),
+  ramMb: z.coerce.number().int().min(MIN_RAM_MB).max(MAX_RAM_MB),
+  port: z.coerce.number().int().min(1024).max(65535),
+  runtimeMode: z.enum(RUNTIME_MODES).default("NATIVE"),
+  minecraftVersion: z.string().max(32).optional(),
+});
+
 export const backupCreateSchema = z.object({
   name: z.string().min(1).max(64).optional(),
 });
@@ -105,3 +114,4 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateServerInput = z.infer<typeof createServerSchema>;
 export type UpdateServerInput = z.infer<typeof updateServerSchema>;
+export type ImportModpackInput = z.infer<typeof importModpackSchema>;

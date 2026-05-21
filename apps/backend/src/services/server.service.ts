@@ -67,7 +67,11 @@ export async function getServerLogs(serverId: string, limit = 80) {
   });
 }
 
-export async function createServer(ownerId: string, input: CreateServerInput) {
+export async function createServer(
+  ownerId: string,
+  input: CreateServerInput,
+  options?: { deferInstall?: boolean }
+) {
   const portTaken = await prisma.server.findUnique({ where: { port: input.port } });
   if (portTaken) throw new AppError(409, "Port already in use", "PORT_TAKEN");
 
@@ -99,20 +103,26 @@ export async function createServer(ownerId: string, input: CreateServerInput) {
     },
   });
 
-  // Install asynchronously
-  installServer(server.id).catch(async (err) => {
+  if (!options?.deferInstall) {
+    scheduleServerInstall(server.id);
+  }
+
+  return server;
+}
+
+/** Run install in background; mark server CRASHED on failure. */
+export function scheduleServerInstall(serverId: string): void {
+  installServer(serverId).catch(async (err) => {
     const message = err instanceof Error ? err.message : String(err);
     const { appendInstallLog } = await import("../lib/install-log");
     const { logger } = await import("../lib/logger");
-    logger.error("Server install failed", { serverId: server.id, err: message, stack: (err as Error).stack });
-    await appendInstallLog(server.id, "error", `Install failed: ${message}`);
+    logger.error("Server install failed", { serverId, err: message, stack: (err as Error).stack });
+    await appendInstallLog(serverId, "error", `Install failed: ${message}`);
     await prisma.server.update({
-      where: { id: server.id },
+      where: { id: serverId },
       data: { status: "CRASHED" },
     });
   });
-
-  return server;
 }
 
 async function installServer(serverId: string): Promise<void> {
@@ -120,7 +130,9 @@ async function installServer(serverId: string): Promise<void> {
 
   if (
     server.serverType === "MODPACK" &&
-    (server.modpackVersionId || server.modpackFileId != null)
+    (server.modpackVersionId ||
+      server.modpackFileId != null ||
+      server.modpackSource === "upload")
   ) {
     await installModpackServer(server);
     return;
@@ -142,26 +154,38 @@ async function installServer(serverId: string): Promise<void> {
 }
 
 async function installModpackServer(server: Awaited<ReturnType<typeof getServer>>): Promise<void> {
-  const source = (server.modpackSource as ModpackSource) ?? "modrinth";
-  const projectId =
-    server.modpackProjectId ?? (server.modpackId != null ? String(server.modpackId) : null);
-  const versionId =
-    server.modpackVersionId ??
-    (server.modpackFileId != null ? String(server.modpackFileId) : null);
-
-  if (!projectId || !versionId) {
-    throw new Error("Modpack project and version id required");
-  }
-
   const { appendInstallLog } = await import("../lib/install-log");
   await appendInstallLog(server.id, "info", "Modpack install started");
 
-  const meta = await installModpackToServer(source, projectId, versionId, server.dataPath, {
-    serverId: server.id,
-    port: server.port,
-    ramMb: server.ramMb,
-    javaVersion: server.javaVersion,
-  });
+  let meta: Awaited<ReturnType<typeof installModpackToServer>>;
+
+  if (server.modpackSource === "upload") {
+    const { installUploadedModpackZip } = await import("./import-modpack.service");
+    meta = await installUploadedModpackZip(server.dataPath, server.id, {
+      port: server.port,
+      ramMb: server.ramMb,
+      javaVersion: server.javaVersion,
+      minecraftVersion: server.minecraftVersion !== "1.20.1" ? server.minecraftVersion : undefined,
+    });
+  } else {
+    const source = (server.modpackSource as ModpackSource) ?? "modrinth";
+    const projectId =
+      server.modpackProjectId ?? (server.modpackId != null ? String(server.modpackId) : null);
+    const versionId =
+      server.modpackVersionId ??
+      (server.modpackFileId != null ? String(server.modpackFileId) : null);
+
+    if (!projectId || !versionId) {
+      throw new Error("Modpack project and version id required");
+    }
+
+    meta = await installModpackToServer(source, projectId, versionId, server.dataPath, {
+      serverId: server.id,
+      port: server.port,
+      ramMb: server.ramMb,
+      javaVersion: server.javaVersion,
+    });
+  }
 
   await prisma.server.update({
     where: { id: server.id },

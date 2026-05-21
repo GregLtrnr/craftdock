@@ -5,9 +5,14 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { ImportModpackForm } from "@/components/modpacks/import-modpack-form";
+import { cn } from "@/lib/utils";
 import type { ModpackSearchResult, ModpackSource, ModpackVersion } from "@craftdock/shared";
 
+type View = "search" | "import";
+
 export default function ModpacksPage() {
+  const [view, setView] = useState<View>("search");
   const [source, setSource] = useState<ModpackSource>("modrinth");
   const [cfAvailable, setCfAvailable] = useState(false);
   const [query, setQuery] = useState("");
@@ -85,98 +90,132 @@ export default function ModpacksPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-sm font-medium text-primary">Hosting</p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight">Modpacks</h1>
-        <p className="mt-2 max-w-xl text-muted">
-          Modrinth by default — no API key. CurseForge is optional if your key still works.
-        </p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-primary">Hosting</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">Modpacks</h1>
+          <p className="mt-2 max-w-xl text-muted">
+            Search online or import a server pack zip from CurseForge.
+          </p>
+        </div>
+        <div className="flex rounded-xl border border-border bg-card/80 p-1">
+          <button
+            type="button"
+            onClick={() => setView("search")}
+            className={cn(
+              "rounded-lg px-4 py-2 text-sm font-medium transition-all",
+              view === "search"
+                ? "bg-primary text-black shadow-sm"
+                : "text-muted hover:text-foreground"
+            )}
+          >
+            Search catalog
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("import")}
+            className={cn(
+              "rounded-lg px-4 py-2 text-sm font-medium transition-all",
+              view === "import"
+                ? "bg-primary text-black shadow-sm"
+                : "text-muted hover:text-foreground"
+            )}
+          >
+            Import zip
+          </button>
+        </div>
       </header>
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant={source === "modrinth" ? "default" : "secondary"}
-          size="sm"
-          onClick={() => setSource("modrinth")}
-        >
-          Modrinth
-        </Button>
-        <Button
-          variant={source === "curseforge" ? "default" : "secondary"}
-          size="sm"
-          onClick={() => setSource("curseforge")}
-          disabled={!cfAvailable}
-          title={cfAvailable ? undefined : "CurseForge API unavailable — check CURSEFORGE_API_KEY"}
-        >
-          CurseForge
-        </Button>
-      </div>
-
-      {!cfAvailable && source === "curseforge" && (
-        <p className="mt-2 text-sm text-muted">
-          CurseForge API blocked or key missing. Use Modrinth or regenerate a key at console.curseforge.com.
-        </p>
-      )}
-
-      <div className="mt-6 flex gap-2">
-        <Input
-          placeholder="Search modpacks..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && search()}
-        />
-        <Button onClick={search} disabled={loading}>
-          Search
-        </Button>
-      </div>
-
-      {error && <p className="mt-4 text-sm text-danger">{error}</p>}
-
-      <div className="mt-8 grid gap-4 lg:grid-cols-2">
-        <div className="space-y-2">
-          {results.map((mod) => (
-            <div
-              key={`${mod.source}-${mod.id}`}
-              role="button"
-              tabIndex={0}
-              className="cursor-pointer"
-              onClick={() => selectModpack(mod)}
-              onKeyDown={(e) => e.key === "Enter" && selectModpack(mod)}
+      {view === "import" ? (
+        <ImportModpackForm />
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={source === "modrinth" ? "default" : "secondary"}
+              size="sm"
+              onClick={() => setSource("modrinth")}
             >
-              <Card className="p-4 hover:border-primary/40">
-                <h3 className="font-medium">{mod.name}</h3>
-                <p className="text-xs text-muted line-clamp-2">{mod.summary}</p>
-                <p className="mt-1 text-xs text-muted">
-                  {mod.downloadCount.toLocaleString()} downloads
-                  {mod.versions?.length ? ` · ${mod.versions.length} version(s)` : ""}
-                </p>
-              </Card>
-            </div>
-          ))}
-        </div>
+              Modrinth
+            </Button>
+            <Button
+              variant={source === "curseforge" ? "default" : "secondary"}
+              size="sm"
+              onClick={() => setSource("curseforge")}
+              disabled={!cfAvailable}
+              title={cfAvailable ? undefined : "CurseForge API unavailable"}
+            >
+              CurseForge
+            </Button>
+          </div>
 
-        {selected && (
-          <Card>
-            <h3 className="font-semibold">{selected.name} — Versions</h3>
-            {filesLoading && <p className="mt-4 text-sm text-muted">Loading versions…</p>}
-            {!filesLoading && files.length === 0 && !error && (
-              <p className="mt-4 text-sm text-muted">No versions found.</p>
-            )}
-            <ul className="mt-4 space-y-2">
-              {files.map((f) => (
-                <li key={f.id} className="flex items-center justify-between text-sm">
-                  <span>
-                    {f.name} ({f.gameVersion})
-                  </span>
-                  <Button size="sm" onClick={() => install(f.id)}>
-                    Install
-                  </Button>
-                </li>
+          {!cfAvailable && source === "curseforge" && (
+            <p className="text-sm text-muted">
+              CurseForge API blocked — use <button type="button" className="text-primary underline" onClick={() => setView("import")}>Import zip</button> with “Download server pack”.
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <Input
+              placeholder="Search modpacks..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && search()}
+            />
+            <Button onClick={search} disabled={loading}>
+              Search
+            </Button>
+          </div>
+
+          {error && <p className="text-sm text-danger">{error}</p>}
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              {results.map((mod) => (
+                <div
+                  key={`${mod.source}-${mod.id}`}
+                  role="button"
+                  tabIndex={0}
+                  className="cursor-pointer"
+                  onClick={() => selectModpack(mod)}
+                  onKeyDown={(e) => e.key === "Enter" && selectModpack(mod)}
+                >
+                  <Card hover className="p-4">
+                    <h3 className="font-medium">{mod.name}</h3>
+                    <p className="text-xs text-muted line-clamp-2">{mod.summary}</p>
+                    <p className="mt-1 text-xs text-muted">
+                      {mod.downloadCount.toLocaleString()} downloads
+                      {mod.versions?.length ? ` · ${mod.versions.length} version(s)` : ""}
+                    </p>
+                  </Card>
+                </div>
               ))}
-            </ul>
-          </Card>
-        )}
-      </div>
+            </div>
+
+            {selected && (
+              <Card>
+                <h3 className="font-semibold">{selected.name} — Versions</h3>
+                {filesLoading && <p className="mt-4 text-sm text-muted">Loading versions…</p>}
+                {!filesLoading && files.length === 0 && !error && (
+                  <p className="mt-4 text-sm text-muted">No versions found.</p>
+                )}
+                <ul className="mt-4 space-y-2">
+                  {files.map((f) => (
+                    <li key={f.id} className="flex items-center justify-between text-sm">
+                      <span>
+                        {f.name} ({f.gameVersion})
+                      </span>
+                      <Button size="sm" onClick={() => install(f.id)}>
+                        Install
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

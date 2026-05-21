@@ -26,6 +26,9 @@ export const DEFAULT_JAVA_VERSION = "21";
 export const MIN_RAM_MB = 512;
 export const MAX_RAM_MB = 65536;
 
+/** Max modpack zip/.mrpack upload size (5 GiB) */
+export const MAX_MODPACK_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
+
 export const ALLOWED_UPLOAD_EXTENSIONS = [
   ".jar",
   ".zip",
